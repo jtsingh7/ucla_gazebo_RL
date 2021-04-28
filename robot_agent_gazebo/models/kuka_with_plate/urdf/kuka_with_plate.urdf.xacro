@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+
+<robot name="kuka_with_plate" xmlns:xacro="http://www.ros.org/wiki/xacro">
+	
+	<xacro:include filename="iiwa7.urdf.xacro"/>
+
+	<xacro:include filename="EEplate.urdf.xacro" name="ee_plate" parent="iiwa_link_7" thickness="0.05" radius="0.25">
+		<origin xyz="0 0 0" rpy="0 0 0"/>
+	</xacro:include>
+
+	<gazebo reference="EEplate_base">
+		<material>Gazebo/Grey</material>
+	</gazebo>
+
+	<gazebo reference="iiwa_link_0">
+		<turnGravityOff>true</turnGravityOff>
+	</gazebo>
+
+	<gazebo reference="iiwa_link_1">
+		<turnGravityOff>true</turnGravityOff>
+	</gazebo>
+
+	<gazebo reference="iiwa_link_2">
+		<turnGravityOff>true</turnGravityOff>
+	</gazebo>
+
+	<gazebo reference="iiwa_link_3">
+		<turnGravityOff>true</turnGravityOff>
+	</gazebo>
+
+	<gazebo reference="iiwa_link_4">
+		<turnGravityOff>true</turnGravityOff>
+	</gazebo>
+
+	<gazebo reference="iiwa_link_5">
+		<turnGravityOff>true</turnGravityOff>
+	</gazebo>
+
+	<gazebo reference="iiwa_link_6">
+		<turnGravityOff>true</turnGravityOff>
+	</gazebo>
+
+	<gazebo reference="iiwa_link_7">
+		<turnGravityOff>true</turnGravityOff>
+	</gazebo>
+
+</robot>
+
+
