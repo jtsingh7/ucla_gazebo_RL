@@ -3,12 +3,13 @@
 <robot name="kuka_with_plate" xmlns:xacro="http://www.ros.org/wiki/xacro">
 	
 	<xacro:include filename="iiwa7.urdf.xacro"/>
+	<xacro:include filename="EEplate.urdf.xacro"/>
 
-	<xacro:include filename="EEplate.urdf.xacro" name="ee_plate" parent="iiwa_link_7" thickness="0.05" radius="0.25">
-		<origin xyz="0 0 0" rpy="0 0 0"/>
-	</xacro:include>
+	<xacro:EEplate parent="iiwa_link_7" name="plate" radius="0.2" thickness="0.04">
+    	<origin xyz="0 0 0" rpy="0 ${pi/2} 0" />
+  	</xacro:EEplate>
 
-	<gazebo reference="EEplate_base">
+	<gazebo reference="plate_base">
 		<material>Gazebo/Grey</material>
 	</gazebo>
 
