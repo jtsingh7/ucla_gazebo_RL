@@ -40,7 +40,7 @@
 	</group>
 
 	<!-- Kuka stuff -->
-	<arg name="hardware_interface" default="EffortJointInterface"/>
+	<arg name="hardware_interface" default="PositionJointInterface"/>
 	
 	<param name="robot_description" command="$(find xacro)/xacro --inorder '$(find robot_agent_gazebo)/models/kuka_with_plate/urdf/kuka_with_plate.urdf.xacro'"/>
 	
