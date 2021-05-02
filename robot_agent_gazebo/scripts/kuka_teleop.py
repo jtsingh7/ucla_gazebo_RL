@@ -3,6 +3,7 @@
 import rospy
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from std_msgs.msg import String
+from sensor_msgs.msg import JointState
 import sys, select, os
 import argparse
 import csv
@@ -13,17 +14,41 @@ import roslaunch
 from datetime import datetime
 import time
 import copy
+import numpy as np
 if os.name == 'nt':
   import msvcrt
 else:
   import tty, termios
 if os.name != 'nt':
     settings = termios.tcgetattr(sys.stdin)
-#parser = argparse.ArgumentParser(description='Kuka arm contact testing')
-#parser.add_argument('--tele',action='store_true',help='Teleop control of kuka joints')
-#args = parser.parse_args()
+
+class jointStates():
+    def __init__(self):
+        self.jointP = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0])
 
 
+
+def subCB(data):
+    '''header: 
+      seq: 518
+      stamp: 
+        secs: 5
+        nsecs: 192000000
+      frame_id: ''
+    name: 
+      - iiwa_joint_1
+      - iiwa_joint_2
+      - iiwa_joint_3
+      - iiwa_joint_4
+      - iiwa_joint_5
+      - iiwa_joint_6
+      - iiwa_joint_7
+    position: [-1.608940705022377e-05, 0.1963626679708783, -7.907939288109844e-05, -1.767154179768859, -6.49173048277163e-05, -0.39268994650126454, 2.2980936021710363e-05]
+    velocity: [2.631205285295091e-05, 0.013103138345484738, 0.00014266646349337587, -0.008253983489471482, -0.0031963378370673703, 0.009067769304986859, -0.0018270169719301647]
+    effort: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]'''
+    s.jointP=np.array(list(data.position))
+    
+    
 
 def getKey():
     if os.name == 'nt':
@@ -40,10 +65,10 @@ def getKey():
     return key
 
 def get_jt(jtp_list,t):
+    jtp_list = jtp_list + s.jointP
     jt = JointTrajectory()
     jt.joint_names = ["iiwa_joint_1","iiwa_joint_2","iiwa_joint_3","iiwa_joint_4","iiwa_joint_5","iiwa_joint_6","iiwa_joint_7"]
     jtp = JointTrajectoryPoint()
-    #jtp_list = [0,0,0,0,0,0,0]
     jtp.positions = jtp_list
     jtp.time_from_start = rospy.Duration.from_sec(t)
     jt.points.append(jtp)
@@ -56,7 +81,7 @@ def tele_joint():
     Interactively set kuka joint positions.
     ---------------------------
     Key controls:
-        0 1 2 3 4 5 6
+        1 2 3 4 5 6 7
              w
         a    s    d
 
@@ -74,39 +99,47 @@ def tele_joint():
 
     rospy.init_node('iiwa_joint_teleop')
     pub = rospy.Publisher('/iiwa/PositionJointInterface_trajectory_controller/command', JointTrajectory, queue_size=10)
+    sub = rospy.Subscriber("/iiwa/joint_states", JointState, subCB)
+    
 
     status = 0
     i=0
-    jtp_list = [0.0,0.0,0.0,0.0,0.0,0.0,0.0]
     t=1
 
     try:
         print(msg)
+        jtp = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0])
         while 1:
             key = getKey()
-
             try:
                 key=int(key)
-                if key<7:
+                if key<8 and key>0:
                     print("Editing joint {}".format(key))
-                    i = key
+                    i = key-1
+                else:
+                    print("Not a valid joint index")
             except:
                 pass
-            
             if key == 'a' :
-                jtp_list[i]+=math.pi/16
-                print(jtp_list)
+                jtp[i]+=math.pi/16
+                print("Desired joint displacements:")
+                print(jtp)
+                print("")
             elif key == 'd' :
-                jtp_list[i]-=math.pi/16
-                print(jtp_list)
+                jtp[i]-=math.pi/16
+                print("Desired joint displacements:")
+                print(jtp)
+                print("")
             elif key == 's' :
-                jtp_list = [0.0,0.0,0.0,0.0,0.0,0.0,0.0]
-                print(jtp_list)
+                jtp[i] = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0])
+                print("Desired joint displacements:")
+                print(jtp)
+                print("")
             elif key == 'w':
                 print("Sending command")
-                jt = get_jt(jtp_list,t)
+                jt = get_jt(jtp,t)
                 pub.publish(jt)
-
+                jtp = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0])
             else:
                 if (key == '\x03'):
                     break
@@ -117,37 +150,11 @@ def tele_joint():
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)    
 
 
-
-def talker():
-    pub = rospy.Publisher('/iiwa/PositionJointInterface_trajectory_controller/command', JointTrajectory, queue_size=10)
-    rospy.init_node('talker', anonymous=True)
-    rate = rospy.Rate(10) # 10hz
-
-    jt = JointTrajectory()
-    #jt.joint_names.append("simple_gripper_right_driver_joint")
-    jt.joint_names = ["toe_foot_joint","foot_leg_joint","leg_arm_joint","arm_hand_joint","hand_finger_joint"]
-    jt.joint_names = ["iiwa_joint_1","iiwa_joint_2","iiwa_joint_3","iiwa_joint_4","iiwa_joint_5","iiwa_joint_6","iiwa_joint_7"]
-    jtp = JointTrajectoryPoint()
-    #jtp.positions.append(10)
-    #jtp.positions = [1,0.5,0.5,0.5,0]
-    jtp.positions = [3.14/2,1.5,0,0,0]
-    #jtp.positions = [0,0.5,0,-0.5,0.5,0,0]
-    jtp.time_from_start = rospy.Duration.from_sec(1)
-    jt.points.append(jtp)
-
-    print(jt)
-
-    while not rospy.is_shutdown():
-        
-        pub.publish(jt)
-        rate.sleep()
-
 if __name__ == '__main__':
-    try:      
-        #if args.tele:
-        #    tele_joint()
-        #else:
+    try:
+        s = jointStates()
         tele_joint()
+
     except rospy.ROSInterruptException:
         pass
 

@@ -3,7 +3,7 @@
 <!-- Initializes kuka and ball for balancing task -->
 <launch>
 	<!-- Some arguments I copied over from a work project -->
-	<arg name="paused" default="false"/>
+	<arg name="paused" default="true"/>
 	<arg name="use_sim_time" default="true"/>
 	<arg name="extra_gazebo_args" default=""/>
 	<arg name="gui" default="true"/>
@@ -44,7 +44,9 @@
 	
 	<param name="robot_description" command="$(find xacro)/xacro --inorder '$(find robot_agent_gazebo)/models/kuka_with_plate/urdf/kuka_with_plate.urdf.xacro'"/>
 	
-	<node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen" args="-urdf -model kuka_with_plate -param robot_description"/>
+	<node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen" args="-urdf -model kuka_with_plate -param robot_description -J iiwa_joint_2 0.19634954084936207 -J iiwa_joint_4 -1.7671458676442586 -J iiwa_joint_6 -0.39269908169872414 "/>
+
+	<node name="urdf_spawner2" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen" args="-file $(find robot_agent_gazebo)/models/ball/urdf/ball.urdf -urdf -x 0.7 -z 0.8 -model the_ball"/>
 
 	<remap from="/$(arg hardware_interface)_trajectory_controller/follow_joint_trajectory" to="/iiwa/$(arg hardware_interface)_trajectory_controller/follow_joint_trajectory"/>
 
