@@ -1,67 +1,59 @@
-#PPO implemenation
-#TO DO: Implement continouous action space functionality. Consider adding entropy bonus to the loss function.
-#Despite being PPO, the agent does appear to occassionally 'forget' and exerperience catastriphic loss on the cartpole environment. May just by a hyperparameter adjustment
-#Should work on most openAI gym discrete action environments, although tuning of hyperparameters is likely required
-import numpy as np
+import os
 import gym
-from Agent import Agent
-from utils import plot_learning_curve
+import sys
+import torch
+from agent import PPO
+from evaluate_policy import evaluate_trained_agent
+
 
 if __name__ == '__main__':
-    env_name = 'CartPole-v0'
-    env = gym.make(env_name)
-    n_games = 1000
 
-    #HyperParameters
-    batch_size = 5
-    n_epochs = 4
-    gamma = 0.99
-    lambda_smooth = 0.95
-    alpha_A = 0.0005 
-    alpha_C = 3*alpha_A
-    fc1_dims = 256
-    fc2_dims = 256
-    clip = 0.2
-    horizon = 20
-    c1 = 0.5
+	#########################################################################################  SETUP  ##############################################################################################################
+	#Test or Train Flag
+	Train = True
+	Test  = True
 
-    learn_iters = 0
-    input_dims = env.observation_space.low.shape
-    n_actions = env.action_space.n
-    agent = Agent(input_dims=input_dims, n_actions=n_actions, gamma=gamma, lambda_smooth = lambda_smooth, alpha_A=alpha_A, alpha_C=alpha_C,
-                  fc1_dims=fc1_dims, fc2_dims=fc2_dims, clip=clip, batch_size=batch_size, horizon=horizon, n_epochs=n_epochs, c1=c1)
+	#Environment
+	env_name = 'LunarLanderContinuous-v2'
+	env = gym.make(env_name)
 
-    figure_file = 'plots/' + env_name + '.png' #will need to create plots folder before running
-    best_score = env.reward_range[0]
-    score_history = []
-    avg_score = 0
-    n_steps = 0
-    render = False
+	#Hyperparamters
+	timesteps_per_batch = 2048             #Number of timesteps for each batch of learning
+	max_timesteps_per_episode = 200	       #Maximum number of timesteps in each episode. Each episode is basically a 'game'
+	n_updates_per_iteration = 10           #Number of epochs per batch
+	gamma = 0.99                           #Discount factor
+	alpha_A = 3e-4                         #Learning rate for Actor Network
+	alpha_C = 6e-4                         #Learning rate for Critic Network
+	clip = 0.2                             #PPO clipping factor
+	fc1_dims = 64                          #Dimensions of first hidden layer
+	fc2_dims = 64                          #Dimensions of second hidden layer
 
-    for game in range(n_games):
+	#Miscellaneous parameters
+	render = True                          #Render flag
+	render_every_i = 10                    #Render every i iterations
+	save_freq = 10                         #Save every i iterations
+	load_previous_networks = True          #Load actor and critic networks from previous training, will default to start training from scratch if networks do not exist
+	total_learn_timesteps = 500_000_000    #Total timesteps to learn before exiting training loop, typically set to a high number to continue learning indefinitely
+	PolicyNetwork_dir = os.getcwd() + '\\Networks\\ppo_actor.pth'
+	CriticNetwork_dir = os.getcwd() + '\\Networks\\ppo_critic.pth'
+	################################################################################################################################################################################################################
 
-        done = False
-        score = 0
-        obs = env.reset()
 
-        while not done:
-            if render: env.render()
-            action, probs, value = agent.choose_action(obs)
-            next_obs, reward, done, info = env.step(action)
-            n_steps += 1
-            score += reward
-            agent.remember(obs, action, probs, value, reward, done)
-            if n_steps % horizon == 0: #learning at the end of each horizon
-                agent.learn()
-                learn_iters += 1
-            obs = next_obs
-        score_history.append(score)
-        avg_score = np.mean(score_history[-100:])
 
-        if avg_score > best_score:
-            best_score = avg_score
-            agent.save_models()
 
-        print('episode', game, 'score %.1f' % score, 'avg score %.1f' % avg_score, 'time_steps', n_steps, 'learning_steps', learn_iters, 'action', action)
-    x = [game+1 for game in range(len(score_history))]
-    plot_learning_curve(x,score_history,figure_file)
+
+
+
+	#####################################################################################  EXECUTING ###############################################################################################################
+	#Create the Agent
+	agent = PPO(env, timesteps_per_batch, max_timesteps_per_episode, n_updates_per_iteration, 
+			    gamma, alpha_A, alpha_C, clip, fc1_dims, fc2_dims, render, render_every_i, save_freq, load_previous_networks, PolicyNetwork_dir, CriticNetwork_dir)
+
+	#Learn
+	if Train == True:
+		agent.learn(total_timesteps=total_learn_timesteps)
+
+	#Test
+	if Test == True:
+		evaluate_trained_agent(PolicyNetwork_dir, env, alpha_A, fc1_dims, fc2_dims, render)
+	################################################################################################################################################################################################################
