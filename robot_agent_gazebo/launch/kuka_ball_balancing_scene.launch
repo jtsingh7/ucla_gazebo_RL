@@ -40,7 +40,7 @@
 	</group>
 
 	<!-- Kuka stuff -->
-	<arg name="hardware_interface" default="PositionJointInterface"/>
+	<arg name="hardware_interface" default="EffortJointInterface"/>
 	
 	<param name="robot_description" command="$(find xacro)/xacro --inorder '$(find robot_agent_gazebo)/models/kuka_with_plate/urdf/kuka_with_plate.urdf.xacro'"/>
 	
@@ -53,7 +53,9 @@
 	<group ns="iiwa">
 		<include file="$(find robot_agent_gazebo)/models/kuka_with_plate/launch/iiwa_control.launch">
 			<arg name="hardware_interface" value="$(arg hardware_interface)"/>
-			<arg name="controllers" value="joint_state_controller $(arg hardware_interface)_trajectory_controller"/>
+			<!--arg name="controllers" value="joint_state_controller $(arg hardware_interface)_trajectory_controller"/-->
+			<arg name="controllers" value="joint_state_controller $(arg hardware_interface)_J1_controller $(arg hardware_interface)_J2_controller
+				$(arg hardware_interface)_J3_controller $(arg hardware_interface)_J4_controller $(arg hardware_interface)_J5_controller $(arg hardware_interface)_J6_controller $(arg hardware_interface)_J7_controller"/>
 			<arg name="robot_name" value="iiwa" />
 			<arg name="model" value="iiwa7"/>
 		</include>
