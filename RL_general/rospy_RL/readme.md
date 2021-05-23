@@ -1,6 +1,5 @@
-inital definition of rospy+agent to interect with sim, uses tensorflow 
+inital definition of rospy+agent to interect with sim, uses tensorflow, rospy commands get state from sim successfully
 
 ### TODO:
-* verify rospy methods work with the sim
-* add NN defniition and learning algorithm
 * continuous action space
+* Lots of debug
