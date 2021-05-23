@@ -131,7 +131,7 @@ def tele_joint():
                 print(jtp)
                 print("")
             elif key == 's' :
-                jtp[i] = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0])
+                jtp = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0])
                 print("Desired joint displacements:")
                 print(jtp)
                 print("")

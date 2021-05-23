@@ -59,5 +59,5 @@ if __name__ == '__main__':
 		evaluate_trained_agent(PolicyNetwork_dir, env, alpha_A, fc1_dims, fc2_dims, render)
 	################################################################################################################################################################################################################
 
-	for i in range(0,200):
+	for i in range(0,2):
 		print(agent.get_gazebo_state())

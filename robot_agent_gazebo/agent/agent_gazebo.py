@@ -9,20 +9,39 @@ import torch.optim as optim
 from torch.distributions import MultivariateNormal
 import rospy
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-from std_msgs.msg import String
+from std_msgs.msg import String, Float64
 from sensor_msgs.msg import JointState
+from gazebo_msgs.srv import GetLinkState
+from gazebo_msgs.srv import GetModelState
+
 
 class PPO_gazebo:
 	def __init__(self, timesteps_per_batch, max_timesteps_per_episode, n_updates_per_iteration, 
 			    gamma, alpha_A, alpha_C, clip, fc1_dims, fc2_dims, render, render_every_i, save_freq, load_previous_networks, PolicyNetwork_dir, CriticNetwork_dir):
 
-		# ROS initialization
+		# ROS-related initialization
 		rospy.init_node('RL_agent')
-		#pub = rospy.Publisher('/iiwa/PositionJointInterface_trajectory_controller/command', JointTrajectory, queue_size=10)
-		self.sub_joint_states = rospy.Subscriber("/iiwa/joint_states", JointState, self.subCB_link_states)
-
-		# Gazebo states
-		self.state_link_states=[]
+		self.pub_joint1 = rospy.Publisher('/iiwa/EffortJointInterface_J1_controller/command', Float64, queue_size=10)
+		self.pub_joint2 = rospy.Publisher('/iiwa/EffortJointInterface_J2_controller/command', Float64, queue_size=10)
+		self.pub_joint3 = rospy.Publisher('/iiwa/EffortJointInterface_J3_controller/command', Float64, queue_size=10)
+		self.pub_joint4 = rospy.Publisher('/iiwa/EffortJointInterface_J4_controller/command', Float64, queue_size=10)
+		self.pub_joint5 = rospy.Publisher('/iiwa/EffortJointInterface_J5_controller/command', Float64, queue_size=10)
+		self.pub_joint6 = rospy.Publisher('/iiwa/EffortJointInterface_J6_controller/command', Float64, queue_size=10)
+		self.pub_joint7 = rospy.Publisher('/iiwa/EffortJointInterface_J7_controller/command', Float64, queue_size=10)
+		self.sub_joint_states = rospy.Subscriber("/iiwa/joint_states", JointState, self.subCB_joint_states)
+		
+		self.ball_state = []
+		self.iiwa_link_0_state = []
+		self.iiwa_link_1_state = []
+		self.iiwa_link_2_state = []
+		self.iiwa_link_3_state = []
+		self.iiwa_link_4_state = []
+		self.iiwa_link_5_state = []
+		self.iiwa_link_6_state = []
+		self.iiwa_link_7_state = []
+		self.iiwa_joint_states = []
+		self.ball_in_plate_frame = []
+		self.ball_dist_from_plate_center = []
 
 		# Debugging (I found that it's about 10x faster to run on a CPU than a GPU, which is counterintuitive and different from previous agents I've run. Will look into, but setting default device to be CPU for now)
 		global device 
@@ -253,10 +272,56 @@ class PPO_gazebo:
 		self.logger['actor_losses'] = []
 
 	def get_gazebo_state(self):
-		return self.state_link_states
+		
+		link_ros = rospy.ServiceProxy('/gazebo/get_link_state', GetLinkState)
+		self.ball_state = link_ros('ball','world')
+		self.iiwa_link_0_state = link_ros('iiwa_link_0','world')
+		self.iiwa_link_1_state = link_ros('iiwa_link_1','world')
+		self.iiwa_link_2_state = link_ros('iiwa_link_2','world')
+		self.iiwa_link_3_state = link_ros('iiwa_link_3','world')
+		self.iiwa_link_4_state = link_ros('iiwa_link_4','world')
+		self.iiwa_link_5_state = link_ros('iiwa_link_5','world')
+		self.iiwa_link_6_state = link_ros('iiwa_link_6','world')
+		self.iiwa_link_7_state = link_ros('iiwa_link_7','world')
+		self.ball_in_plate_frame = link_ros('ball','iiwa_link_7')
 
-	def subCB_link_states(self,data):
-		self.state_link_states = data
+		self.ball_plate_dist_calc()
+
+		#return self.ball_dist_from_plate_center #TODO: decide the format of the whole state
+		return Float64()
+
+	def ball_plate_dist_calc(self):
+
+		# Suppose the iiwa_link_7 frame was centered at the plate center:
+		ball_plate_y = self.ball_in_plate_frame.link_state.pose.position.y
+		ball_plate_z = self.ball_in_plate_frame.link_state.pose.position.z - 0.2
+
+		self.ball_dist_from_plate_center = np.linalg.norm(np.array((ball_plate_z,ball_plate_y)))
+
+	def subCB_joint_states(self,data):
+
+		self.iiwa_joint_states = data
+
+		# A message looks like this:
+		'''header: 
+		  seq: 175010
+		  stamp: 
+		    secs: 1750
+		    nsecs: 112000000
+		  frame_id: ''
+		name: 
+		  - iiwa_joint_1
+		  - iiwa_joint_2
+		  - iiwa_joint_3
+		  - iiwa_joint_4
+		  - iiwa_joint_5
+		  - iiwa_joint_6
+		  - iiwa_joint_7
+		position: [-6.947010247948526e-06, 0.19634947740073727, 6.537230698100416e-06, -1.7671458774993676, -1.75296373683409e-06, -0.3926990854628787, 2.4836897667412927e-06]
+		velocity: [-0.010000948512075985, -0.00012689598800587644, 0.010264604016930764, -1.9681708510272394e-05, -0.0013172871692685053, -7.528297296069183e-06, 0.0013265745694800732]
+		effort: [-1.1170659660860227, -42.19300206382932, -0.28039639378316916, 30.654842491443432, -1.7280505378803077, -3.1108899151416978, 0.004992888739265563]
+		'''
+
 
 
 
@@ -310,3 +375,4 @@ class CriticNN(nn.Module):
 
 		value = self.critic(state)
 		return value
+
