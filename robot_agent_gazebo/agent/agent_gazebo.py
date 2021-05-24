@@ -125,9 +125,13 @@ class PPO_gazebo:
 				surr1 = ratios * A_k
 				surr2 = T.clamp(ratios, 1 - self.clip, 1 + self.clip) * A_k
 
-				# Calculate actor and critic losses.
+				# Calculate actor and critic losses
 				actor_loss = (-T.min(surr1, surr2)).mean()
 				critic_loss = nn.MSELoss()(V, batch_rtgs)
+				
+				# Zeroing gradient prior to stepping
+				self.actor.optimizer.zero_grad()
+				self.critic.optimizer.zero_grad()
 
 				# Calculate total loss and back propogate
 				total_loss = actor_loss + critic_loss
