@@ -96,6 +96,10 @@ class PPO:
 				# Calculate actor and critic losses.
 				actor_loss = (-T.min(surr1, surr2)).mean()
 				critic_loss = nn.MSELoss()(V, batch_rtgs)
+				
+				# Zeroing gradient prior to stepping
+				self.actor.optimizer.zero_grad()
+				self.critic.optimizer.zero_grad()
 
 				# Calculate total loss and back propogate
 				total_loss = actor_loss + critic_loss
