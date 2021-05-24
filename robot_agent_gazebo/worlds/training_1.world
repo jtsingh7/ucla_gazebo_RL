@@ -8,6 +8,12 @@
 		<include>
 			<uri>model://sun</uri>
 		</include>
+		
+		<!-- Ground Plane -->
+		<include>
+			<uri>model://ground_plane</uri>
+		</include>
+		
 
 		<gravity>0 0 -9.8</gravity>
 
