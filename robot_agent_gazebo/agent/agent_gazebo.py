@@ -13,6 +13,7 @@ from std_msgs.msg import String, Float64
 from sensor_msgs.msg import JointState
 from gazebo_msgs.srv import GetLinkState
 from gazebo_msgs.srv import GetModelState
+from tf.transformations import quaternion_matrix as rot
 
 
 class PPO_gazebo:
@@ -153,8 +154,6 @@ class PPO_gazebo:
 				T.save(self.actor.state_dict(), actor_network_dir)
 				T.save(self.critic.state_dict(), critic_network_dir)
 
-
-
 	def rollout(self):
 
 		batch_obs = []
@@ -188,7 +187,6 @@ class PPO_gazebo:
 				batch_log_probs.append(log_prob)
 				if done:
 					break
-
 
 			# Track episodic lengths and rewards
 			batch_lens.append(ep_t + 1)
@@ -279,20 +277,75 @@ class PPO_gazebo:
 		
 		link_ros = rospy.ServiceProxy('/gazebo/get_link_state', GetLinkState)
 		self.ball_state = link_ros('ball','world')
-		self.iiwa_link_0_state = link_ros('iiwa_link_0','world')
-		self.iiwa_link_1_state = link_ros('iiwa_link_1','world')
-		self.iiwa_link_2_state = link_ros('iiwa_link_2','world')
-		self.iiwa_link_3_state = link_ros('iiwa_link_3','world')
-		self.iiwa_link_4_state = link_ros('iiwa_link_4','world')
-		self.iiwa_link_5_state = link_ros('iiwa_link_5','world')
-		self.iiwa_link_6_state = link_ros('iiwa_link_6','world')
 		self.iiwa_link_7_state = link_ros('iiwa_link_7','world')
 		self.ball_in_plate_frame = link_ros('ball','iiwa_link_7')
-
+		'''
+		link_state: 
+		  link_name: "iiwa_link_7"
+		  pose: 
+		    position: 
+		      x: 0.5265679583380167
+		      y: 2.959748300857525e-05
+		      z: 0.5725562939026705
+		    orientation: 
+		      x: 0.0005520473927489056
+		      y: 0.7155809849641402
+		      z: 0.00030666804927524844
+		      w: 0.6985294948362127
+		  twist: 
+		    linear: 
+		      x: 1.0495646696811689e-05
+		      y: 2.8729811809361537e-05
+		      z: 0.00010343615669669576
+		    angular: 
+		      x: -8.324382197011424e-05
+		      y: -0.00021473057717805527
+		      z: 0.00021159956898025696
+		  reference_frame: "world"
+		success: True
+		status_message: "GetLinkState: got state"
+		'''
+		theta, phi = self.plate_angles()
 		self.ball_plate_dist_calc()
 
-		#return self.ball_dist_from_plate_center #TODO: decide the format of the whole state
-		return Float64()
+		'''The state vector is formatted as follows:
+		joint positions 1-7,joint velocities 1-7,plate roll,plate pitch,plate xyz,ball xyz,ball velocity xyz
+		'''
+		state_list = []
+
+		for i in self.iiwa_joint_states.position: #add joint states
+			state_list.append(i)
+		for i in self.iiwa_joint_states.velocity: #add joint velocities
+			state_list.append(i)
+		state_list.append(theta)
+		state_list.append(phi)
+		state_list.append(self.iiwa_link_7_state.link_state.pose.position.x)
+		state_list.append(self.iiwa_link_7_state.link_state.pose.position.y)
+		state_list.append(self.iiwa_link_7_state.link_state.pose.position.z)
+		state_list.append(self.ball_state.link_state.pose.position.x)
+		state_list.append(self.ball_state.link_state.pose.position.y)
+		state_list.append(self.ball_state.link_state.pose.position.z)
+		state_list.append(self.ball_state.link_state.twist.linear.x)
+		state_list.append(self.ball_state.link_state.twist.linear.y)
+		state_list.append(self.ball_state.link_state.twist.linear.z)
+
+		state = np.array(state_list)
+
+		return state
+
+	def plate_angles(self):
+
+		hm = rot([self.iiwa_link_7_state.link_state.pose.orientation.x,
+					self.iiwa_link_7_state.link_state.pose.orientation.y,
+					self.iiwa_link_7_state.link_state.pose.orientation.z,
+					self.iiwa_link_7_state.link_state.pose.orientation.w])
+		theta_rad = np.arcsin(-hm[2,2])
+		phi_rad = np.arcsin(-hm[2,1])
+
+		theta_deg = theta_rad * (180/3.14159)
+		phi_deg = phi_rad * (180/3.14159)
+
+		return theta_deg, phi_deg
 
 	def ball_plate_dist_calc(self):
 
@@ -326,9 +379,40 @@ class PPO_gazebo:
 		effort: [-1.1170659660860227, -42.19300206382932, -0.28039639378316916, 30.654842491443432, -1.7280505378803077, -3.1108899151416978, 0.004992888739265563]
 		'''
 
+	def reward_from_state(self,state):
+		#def calc_Reward(ball_pos, plate_pos, plate_angle, control_effort):
 
+		'''
+		#constants to be tuned
+		c1 = 1
+		c2 = 1
+		c3 = 1
 
+		#calculated reward of ball position
+		x = ball_pos_x - plate_pos_x
+		y = ball_pos_y - plate_pos_y
+		z = ball_pos_z - plate_pos_z
+		r_ball = np.exp(-c1*(x^2 + y^2 + z^2))           #larger penealty for larger distances from center of plate
 
+		#calculated reward of plate angle
+		Phi = plate_pos_roll
+		Theta = plate_pos_pitch
+		Psi = plate_pos_yaw
+		r_plate = -c2*(Phi^2 + Theta^2 + Psi^2)          #penalty for large plate angles
+
+		#calculated reward of control effort
+		r_action = -c3*(square and sum all torques)      #penalty for torque commands
+
+		#Total Reward
+		R = r_ball + r_plate + r_action
+		'''
+
+		#return R
+		pass
+
+	def gazebo_step(self,action):
+
+		return state, reward, done
 
 
 class ActorNN(nn.Module):
