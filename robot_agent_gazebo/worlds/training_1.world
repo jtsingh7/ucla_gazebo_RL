@@ -14,9 +14,40 @@
 			<uri>model://ground_plane</uri>
 		</include>
 		
-
+		
+		
+		<!-- Table for end effector to rest on -->
+		<model name="table">
+			<pose>0.7 0 0.2 0 0 0</pose>
+			<static>true</static>
+			<link name="box">
+				<intertial>
+					<mass>10</mass>
+				</intertial>
+				<collision name="colission">
+					<geometry>
+						<box>
+							<size>0.3 0.3 0.6</size>
+						</box>
+					</geometry>
+				</collision>
+				<visual name="visual">
+					<geometry>
+						<box>
+							<size>0.3 0.3 0.6</size>
+						</box>
+					</geometry>
+				</visual>
+			</link>
+		</model>
+		
+		
+		
+		
 		<gravity>0 0 -9.8</gravity>
 
+		
+		
 		<!-- A nice outdoor scene -->
 		<scene>
 			<sky>
