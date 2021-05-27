@@ -37,6 +37,8 @@ if __name__ == '__main__':
 	total_learn_timesteps = 500_000_000    #Total timesteps to learn before exiting training loop, typically set to a high number to continue learning indefinitely
 	PolicyNetwork_dir = os.getcwd() + '\\Networks\\ppo_actor.pth'
 	CriticNetwork_dir = os.getcwd() + '\\Networks\\ppo_critic.pth'
+	figure_file = 'plots/' + env_name + '.png' #will need to create plots folder before running
+
 	################################################################################################################################################################################################################
 
 
@@ -53,6 +55,7 @@ if __name__ == '__main__':
 	#Learn
 	if Train == True:
 		agent.learn(total_timesteps=total_learn_timesteps)
+		agent.plot_training(figure_file)
 
 	#Test
 	if Test == True:
