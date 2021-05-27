@@ -7,6 +7,7 @@ import torch as T
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import MultivariateNormal
+import matplotlib.pyplot as plt
 import rospy
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from std_msgs.msg import String, Float64
@@ -65,6 +66,7 @@ class PPO_gazebo:
 		self.render = render
 		self.render_every_i = render_every_i
 		self.save_freq = save_freq
+		self.score_history = []
 
 		# Initialize actor and critic networks
 		self.actor = ActorNN(input_dims=self.obs_dims, action_dims=self.action_dims, alpha_A=self.alpha_A, fc1_dims=self.fc1_dims, fc2_dims=self.fc2_dims)                                                   # ALG STEP 1
@@ -170,6 +172,7 @@ class PPO_gazebo:
 		#Creating the batch of data
 		while t < self.timesteps_per_batch:
 			ep_rewards = [] 
+			score = 0
 
 			#state = self.env.reset()
 			state = self.get_gazebo_state()
@@ -182,11 +185,15 @@ class PPO_gazebo:
 				batch_obs.append(state)
 				action, log_prob = self.get_action(state)
 				state, reward, done, _ = self.env.step(action)
+				score =+ reward
 				ep_rewards.append(reward)
 				batch_acts.append(action)
 				batch_log_probs.append(log_prob)
 				if done:
 					break
+					
+			# Track score history for plotting (total reward for each episode)
+			self.score_history.append(score)
 
 			# Track episodic lengths and rewards
 			batch_lens.append(ep_t + 1)
@@ -272,6 +279,20 @@ class PPO_gazebo:
 		self.logger['batch_lens'] = []
 		self.logger['batch_rews'] = []
 		self.logger['actor_losses'] = []
+		
+		
+	def plot_training(self, filename):
+		running_avg = np.zeros(len(self.score_history))
+		bucket = 100
+		for i in range(len(running_avg)):
+			running_avg[i] = np.mean(self.score_history[max(0, i-bucket):(i+1)])
+		x = np.arange(1,len(running_avg)+1,1)
+		plt.plot(x, running_avg)
+		plt.title(('Running average of total return from previous 100 episodes'))
+		plt.xlabel('Episode')
+		plt.ylabel('Average Total Return')
+		plt.savefig(filename)
+
 
 	def get_gazebo_state(self):
 		
