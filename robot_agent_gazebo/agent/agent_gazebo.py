@@ -309,7 +309,7 @@ class PPO_gazebo:
 		self.ball_plate_dist_calc()
 
 		'''The state vector is formatted as follows:
-		joint positions 1-7,joint velocities 1-7,plate roll,plate pitch,plate xyz,ball xyz,ball velocity xyz
+		joint positions 1-7,joint velocities 1-7,plate roll,plate pitch,plate xyz,ball xyz,ball velocity xyz,ball dist from plate center
 		'''
 		state_list = []
 
@@ -328,6 +328,7 @@ class PPO_gazebo:
 		state_list.append(self.ball_state.link_state.twist.linear.x)
 		state_list.append(self.ball_state.link_state.twist.linear.y)
 		state_list.append(self.ball_state.link_state.twist.linear.z)
+		state_list.append(self.ball_dist_from_plate_center)
 
 		state = np.array(state_list)
 
@@ -379,40 +380,46 @@ class PPO_gazebo:
 		effort: [-1.1170659660860227, -42.19300206382932, -0.28039639378316916, 30.654842491443432, -1.7280505378803077, -3.1108899151416978, 0.004992888739265563]
 		'''
 
-	def reward_from_state(self,state):
-		#def calc_Reward(ball_pos, plate_pos, plate_angle, control_effort):
+	def reward_from_state(self,state,control=None):
+		'''Calculate reward based on state and control effort.
 
+		Params
+		----------
+		state : np.array
+			array of [joint positions 1-7,joint velocities 1-7,plate roll,plate pitch,plate xyz,ball xyz,ball velocity xyz,ball dist from plate center]
+		control : np.array
+			if supplied, we are using torque commands as actions and thus it is a 7-vector
 		'''
+
 		#constants to be tuned
 		c1 = 1
 		c2 = 1
 		c3 = 1
 
 		#calculated reward of ball position
-		x = ball_pos_x - plate_pos_x
-		y = ball_pos_y - plate_pos_y
-		z = ball_pos_z - plate_pos_z
-		r_ball = np.exp(-c1*(x^2 + y^2 + z^2))           #larger penealty for larger distances from center of plate
+		ball_dist_from_plate_center = state[-1]
+		r_ball = np.exp(-c1*(ball_dist_from_plate_center)) #larger penalty for larger distances from center of plate
 
 		#calculated reward of plate angle
-		Phi = plate_pos_roll
-		Theta = plate_pos_pitch
-		Psi = plate_pos_yaw
-		r_plate = -c2*(Phi^2 + Theta^2 + Psi^2)          #penalty for large plate angles
+		theta = state[14]
+		phi = state[15]
+		r_plate = -c2*(phi^2 + theta^2) #penalty for large plate angles
 
 		#calculated reward of control effort
-		r_action = -c3*(square and sum all torques)      #penalty for torque commands
+		if control:
+			r_action = -c3*(np.dot(control,control)) #penalty for torque commands
+		else:
+			r_action = 0
 
 		#Total Reward
 		R = r_ball + r_plate + r_action
-		'''
-
-		#return R
-		pass
+		
+		return R
 
 	def gazebo_step(self,action):
 
-		return state, reward, done
+		pass
+		#return state, reward, done
 
 
 class ActorNN(nn.Module):
