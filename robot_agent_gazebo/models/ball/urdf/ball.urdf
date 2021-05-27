@@ -28,8 +28,10 @@
 		</link>
 
 		<gazebo reference="ball">
-       <material>Gazebo/Blue</material>
-     </gazebo>
+			<mu1>0.05</mu1>
+			<mu2>0.05</mu2>
+       		<material>Gazebo/Blue</material>
+     		</gazebo>
     	
 
 </robot>
