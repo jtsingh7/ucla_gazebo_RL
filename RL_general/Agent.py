@@ -7,6 +7,7 @@ import torch as T
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import MultivariateNormal
+import matplotlib.pyplot as plt
 
 class PPO:
 	def __init__(self, env, timesteps_per_batch, max_timesteps_per_episode, n_updates_per_iteration, 
@@ -32,6 +33,7 @@ class PPO:
 		self.render = render
 		self.render_every_i = render_every_i
 		self.save_freq = save_freq
+		self.score_history = []
 
 		# Initialize actor and critic networks
 		self.actor = ActorNN(input_dims=self.obs_dims, action_dims=self.action_dims, alpha_A=self.alpha_A, fc1_dims=self.fc1_dims, fc2_dims=self.fc2_dims)                                                   # ALG STEP 1
@@ -139,6 +141,7 @@ class PPO:
 		#Creating the batch of data
 		while t < self.timesteps_per_batch:
 			ep_rewards = [] 
+			score = 0
 
 			state = self.env.reset()
 			done = False
@@ -150,12 +153,15 @@ class PPO:
 				batch_obs.append(state)
 				action, log_prob = self.get_action(state)
 				state, reward, done, _ = self.env.step(action)
+				score += reward
 				ep_rewards.append(reward)
 				batch_acts.append(action)
 				batch_log_probs.append(log_prob)
 				if done:
 					break
-
+					
+			# Track score history for plotting (total rewards for each episode)
+			self.score_history.append(score)
 
 			# Track episodic lengths and rewards
 			batch_lens.append(ep_t + 1)
@@ -245,7 +251,17 @@ class PPO:
 
 
 
-
+	def plot_training(self, filename):
+		running_avg = np.zeros(len(self.score_history))
+		bucket = 100
+		for i in range(len(running_avg)):
+			running_avg[i] = np.mean(self.score_history[max(0, i-bucket):(i+1)])
+		x = np.arange(1,len(running_avg)+1,1)
+		plt.plot(x, running_avg)
+		plt.title(('Running average of total return from previous 100 episodes'))
+		plt.xlabel('Episode')
+		plt.ylabel('Average Total Return')
+		plt.savefig(filename)
 
 
 
