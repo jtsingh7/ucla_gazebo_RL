@@ -18,8 +18,8 @@ from tf.transformations import quaternion_matrix as rot
 
 
 class PPO_gazebo:
-	def __init__(self, timesteps_per_batch, max_timesteps_per_episode, n_updates_per_iteration, 
-			    gamma, alpha_A, alpha_C, clip, fc1_dims, fc2_dims, render, render_every_i, save_freq, load_previous_networks, PolicyNetwork_dir, CriticNetwork_dir):
+	def __init__(self,task,timesteps_per_batch, max_timesteps_per_episode, n_updates_per_iteration, 
+			    gamma, alpha_A, alpha_C, clip, fc1_dims, fc2_dims, save_freq, load_previous_networks, PolicyNetwork_dir, CriticNetwork_dir):
 
 		# ROS-related initialization
 		rospy.init_node('RL_agent')
@@ -45,6 +45,9 @@ class PPO_gazebo:
 		self.ball_in_plate_frame = []
 		self.ball_dist_from_plate_center = []
 
+		# The task to solve, which affects the reward function
+		self.tasknum = task
+
 		# Debugging (I found that it's about 10x faster to run on a CPU than a GPU, which is counterintuitive and different from previous agents I've run. Will look into, but setting default device to be CPU for now)
 		global device 
 		device= 'cpu'
@@ -63,8 +66,6 @@ class PPO_gazebo:
 		self.timesteps_per_batch = timesteps_per_batch
 		self.max_timesteps_per_episode = max_timesteps_per_episode
 		self.n_updates_per_iteration = n_updates_per_iteration
-		self.render = render
-		self.render_every_i = render_every_i
 		self.save_freq = save_freq
 		self.score_history = []
 
@@ -174,17 +175,16 @@ class PPO_gazebo:
 			ep_rewards = [] 
 			score = 0
 
-			#state = self.env.reset()
-			state = self.get_gazebo_state()
+			self.gazebo_reset()				# reset gazebo enviroment
+			state = self.get_gazebo_state() # get initial state from gazebo
 			done = False
 
 			for ep_t in range(self.max_timesteps_per_episode):
-				if self.render and (self.logger['i_so_far'] % self.render_every_i == 0) and len(batch_lens) == 0:
-					self.env.render()
+				
 				t += 1 
 				batch_obs.append(state)
 				action, log_prob = self.get_action(state)
-				state, reward, done, _ = self.env.step(action)
+				state, reward, done = self.gazebo_step(action)
 				score =+ reward
 				ep_rewards.append(reward)
 				batch_acts.append(action)
@@ -330,7 +330,7 @@ class PPO_gazebo:
 		self.ball_plate_dist_calc()
 
 		'''The state vector is formatted as follows:
-		joint positions 1-7,joint velocities 1-7,plate roll,plate pitch,plate xyz,ball xyz,ball velocity xyz,ball dist from plate center
+		joint positions 1-7,joint velocities 1-7,plate theta,plate phi,plate xyz,ball xyz,ball velocity xyz,ball dist from plate center
 		'''
 		state_list = []
 
@@ -439,9 +439,48 @@ class PPO_gazebo:
 
 	def gazebo_step(self,action):
 
-		pass
-		#return state, reward, done
+		# 1. Publish action
+		# 2. Wait small amount of time
+		# 3. Get new state
+		# 4. Calculate reward based on new state
 
+		self.send_actions(action)
+
+		self.wait()
+
+		new_state = self.get_gazebo_state()
+
+		if self.task == 1:
+			reward = self.reward_from_state(new_state)
+		elif self.task == 2:
+			reward = self.reward_from_state(new_state,action)
+
+		# TODO: DETERMINE DONE VARIABLE SOMEHOW
+		done = False
+
+		return new_state, reward, done
+
+
+	def gazebo_reset(self):
+		pass
+
+		#INSERT GAZEBO RESET HERE
+
+	def wait(self):
+		# TODO use rospy.rate or similar to wait for desired amount of time
+		pass
+
+	def send_actions(self,actions)
+
+		# TODO need to know how many actions to publish, which joints in use, etc.
+		# ALSO TODO: see if publishers have a "receipt" ability to let you know when message was actually received?
+		self.pub_joint1.publish(actions[0])
+		self.pub_joint2.publish(actions[1])
+		self.pub_joint3.publish(actions[2])
+		self.pub_joint4.publish(actions[3])
+		self.pub_joint5.publish(actions[4])
+		self.pub_joint6.publish(actions[5])
+		self.pub_joint7.publish(actions[6])
 
 class ActorNN(nn.Module):
 	def __init__(self, input_dims, action_dims, alpha_A, fc1_dims, fc2_dims):
