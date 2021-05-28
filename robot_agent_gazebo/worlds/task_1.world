@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+
+<!-- A basic world for RL training (task 1, position control and wind disturbance) -->
+<sdf version="1.6">
+	<world name="default">
+
+		<!--Sunlight (without physical sun model)-->
+		<include>
+			<uri>model://sun</uri>
+		</include>
+		
+		<!-- Ground Plane -->
+		<include>
+			<uri>model://ground_plane</uri>
+		</include>
+
+
+		<gravity>0 0 -9.8</gravity>
+
+		<!-- A nice outdoor scene -->
+		<scene>
+			<sky>
+				<time>12</time>
+				<clouds>
+					<humidity>0.1</humidity>
+				</clouds>
+			</sky>
+		</scene>
+	</world>
+</sdf>

@@ -13,7 +13,7 @@
 	<arg name="physics" default="ode"/>
 	<arg name="verbose" default="false"/>
 	<arg name="output" default="screen"/>
-	<arg name="world_name" default="$(find robot_agent_gazebo)/worlds/training_1.world"/>
+	<arg name="world_name" default="$(find robot_agent_gazebo)/worlds/task_1.world"/>
 	<arg name="respawn_gazebo" default="false"/>
 	<arg name="pub_clock_frequency" default="100"/>
 	<arg name="use_clock_frequency" default="false"/>

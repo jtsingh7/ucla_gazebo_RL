@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 
-<!-- A basic world for RL training -->
+<!-- A basic world for RL training (task 2, effort control with resting table) -->
 <sdf version="1.6">
 	<world name="default">
 
