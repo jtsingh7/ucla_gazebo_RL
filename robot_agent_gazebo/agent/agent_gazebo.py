@@ -190,6 +190,7 @@ class PPO_gazebo:
 				batch_acts.append(action)
 				batch_log_probs.append(log_prob)
 				if done:
+					self.pause()
 					break
 					
 			# Track score history for plotting (total reward for each episode)
@@ -467,6 +468,9 @@ class PPO_gazebo:
 	def gazebo_reset(self):
 		rospy.wait_for_service('/gazebo/reset_simulation') 
 		rospy.ServiceProxy('/gazebo/reset_simulation', Empty)
+		rospy.wait_for_service('/gazebo/unpause_physics')
+		rospy.ServiceProxy('/gazebo/unpause_physics', Empty)
+		
 		state = get_gazebo_state()
 		
 		return state
@@ -474,7 +478,11 @@ class PPO_gazebo:
 	def wait(self):
 		# TODO use rospy.rate or similar to wait for desired amount of time
 		pass
-
+	
+	def pause(self):
+		rospy.wait_for_service('/gazebo/pause_physics')
+		pause = rospy.ServiceProxy('/gazebo/pause_physics', Empty)
+		
 	def send_actions(self,actions)
 
 		# TODO need to know how many actions to publish, which joints in use, etc.
