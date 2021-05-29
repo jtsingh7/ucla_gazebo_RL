@@ -15,9 +15,6 @@ if __name__ == '__main__':
 	Train = False
 	Test  = False
 
-	#env_name = 'LunarLanderContinuous-v2'
-	#env = gym.make(env_name)
-
 	#Hyperparamters
 	timesteps_per_batch = 2048             #Number of timesteps for each batch of learning
 	max_timesteps_per_episode = 200	       #Maximum number of timesteps in each episode. Each episode is basically a 'game'
@@ -30,8 +27,7 @@ if __name__ == '__main__':
 	fc2_dims = 64                          #Dimensions of second hidden layer
 
 	#Miscellaneous parameters
-	render = True                          #Render flag
-	render_every_i = 10                    #Render every i iterations
+	task = 2                               #TODO pull task number from launch file, only placeholder
 	save_freq = 10                         #Save every i iterations
 	load_previous_networks = True          #Load actor and critic networks from previous training, will default to start training from scratch if networks do not exist
 	total_learn_timesteps = 500_000_000    #Total timesteps to learn before exiting training loop, typically set to a high number to continue learning indefinitely
@@ -49,8 +45,8 @@ if __name__ == '__main__':
 
 	#####################################################################################  EXECUTING ###############################################################################################################
 	#Create the Agent
-	agent = PPO_gazebo(timesteps_per_batch, max_timesteps_per_episode, n_updates_per_iteration, 
-			    gamma, alpha_A, alpha_C, clip, fc1_dims, fc2_dims, render, render_every_i, save_freq, load_previous_networks, PolicyNetwork_dir, CriticNetwork_dir)
+	agent = PPO_gazebo(task, timesteps_per_batch, max_timesteps_per_episode, n_updates_per_iteration, 
+			    gamma, alpha_A, alpha_C, clip, fc1_dims, fc2_dims, save_freq, load_previous_networks, PolicyNetwork_dir, CriticNetwork_dir)
 
 	#Learn
 	if Train == True:
