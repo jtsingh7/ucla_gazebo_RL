@@ -455,8 +455,11 @@ class PPO_gazebo:
 		elif self.task == 2:
 			reward = self.reward_from_state(new_state,action)
 
-		# TODO: DETERMINE DONE VARIABLE SOMEHOW
-		done = False
+		#Done if ball is on ground
+		if self.ball_state.link_state.pose.position.z <= 0.05:
+			done = True
+		else:
+			done = False
 
 		return new_state, reward, done
 
