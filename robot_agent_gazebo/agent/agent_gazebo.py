@@ -483,8 +483,7 @@ class PPO_gazebo:
 		rospy.wait_for_service('/gazebo/pause_physics')
 		pause = rospy.ServiceProxy('/gazebo/pause_physics', Empty)
 		
-	def send_actions(self,actions)
-
+	def send_actions(self,actions):
 		# TODO need to know how many actions to publish, which joints in use, etc.
 		# ALSO TODO: see if publishers have a "receipt" ability to let you know when message was actually received?
 		self.pub_joint1.publish(actions[0])
