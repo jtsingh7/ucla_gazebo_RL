@@ -19,20 +19,34 @@ from tf.transformations import quaternion_matrix as rot
 
 class PPO_gazebo:
 	def __init__(self,task,timesteps_per_batch, max_timesteps_per_episode, n_updates_per_iteration, 
-			    gamma, alpha_A, alpha_C, clip, fc1_dims, fc2_dims, save_freq, load_previous_networks, PolicyNetwork_dir, CriticNetwork_dir):
+			    gamma, alpha_A, alpha_C, clip, fc1_dims, fc2_dims, save_freq, load_previous_networks, 
+			    PolicyNetwork_dir, CriticNetwork_dir, joints_in_use=[True,True,True,True,True,True,True]):
 
 		# ROS-related initialization
 		rospy.init_node('RL_agent')
-		self.pub_joint1 = rospy.Publisher('/iiwa/EffortJointInterface_J1_controller/command', Float64, queue_size=10)
-		self.pub_joint2 = rospy.Publisher('/iiwa/EffortJointInterface_J2_controller/command', Float64, queue_size=10)
-		self.pub_joint3 = rospy.Publisher('/iiwa/EffortJointInterface_J3_controller/command', Float64, queue_size=10)
-		self.pub_joint4 = rospy.Publisher('/iiwa/EffortJointInterface_J4_controller/command', Float64, queue_size=10)
-		self.pub_joint5 = rospy.Publisher('/iiwa/EffortJointInterface_J5_controller/command', Float64, queue_size=10)
-		self.pub_joint6 = rospy.Publisher('/iiwa/EffortJointInterface_J6_controller/command', Float64, queue_size=10)
-		self.pub_joint7 = rospy.Publisher('/iiwa/EffortJointInterface_J7_controller/command', Float64, queue_size=10)
+		self.task = task # The task to solve
+		self.joints_in_use = joints_in_use # this is a boolean 7-vector indicating which joints are in use for the problem
+
+		# Publishers and subscribers
+		if self.task == 1:
+			self.pub_joint1 = rospy.Publisher('/iiwa/EffortJointInterface_J1_controller/command', Float64, queue_size=10)
+			self.pub_joint2 = rospy.Publisher('/iiwa/EffortJointInterface_J2_controller/command', Float64, queue_size=10)
+			self.pub_joint3 = rospy.Publisher('/iiwa/EffortJointInterface_J3_controller/command', Float64, queue_size=10)
+			self.pub_joint4 = rospy.Publisher('/iiwa/EffortJointInterface_J4_controller/command', Float64, queue_size=10)
+			self.pub_joint5 = rospy.Publisher('/iiwa/EffortJointInterface_J5_controller/command', Float64, queue_size=10)
+			self.pub_joint6 = rospy.Publisher('/iiwa/EffortJointInterface_J6_controller/command', Float64, queue_size=10)
+			self.pub_joint7 = rospy.Publisher('/iiwa/EffortJointInterface_J7_controller/command', Float64, queue_size=10)
+		elif self.task == 2:
+			self.pub_joint1 = rospy.Publisher('/iiwa/EffortJointInterface_J1_controller_E/command', Float64, queue_size=10)
+			self.pub_joint2 = rospy.Publisher('/iiwa/EffortJointInterface_J2_controller_E/command', Float64, queue_size=10)
+			self.pub_joint3 = rospy.Publisher('/iiwa/EffortJointInterface_J3_controller_E/command', Float64, queue_size=10)
+			self.pub_joint4 = rospy.Publisher('/iiwa/EffortJointInterface_J4_controller_E/command', Float64, queue_size=10)
+			self.pub_joint5 = rospy.Publisher('/iiwa/EffortJointInterface_J5_controller_E/command', Float64, queue_size=10)
+			self.pub_joint6 = rospy.Publisher('/iiwa/EffortJointInterface_J6_controller_E/command', Float64, queue_size=10)
+			self.pub_joint7 = rospy.Publisher('/iiwa/EffortJointInterface_J7_controller_E/command', Float64, queue_size=10)
 		self.sub_joint_states = rospy.Subscriber("/iiwa/joint_states", JointState, self.subCB_joint_states)
 		
-		
+		# State tracking
 		self.ball_state = []
 		self.iiwa_link_0_state = []
 		self.iiwa_link_1_state = []
@@ -46,8 +60,14 @@ class PPO_gazebo:
 		self.ball_in_plate_frame = []
 		self.ball_dist_from_plate_center = []
 
-		# The task to solve, which affects the reward function
-		self.tasknum = task
+		# Kuka joint limits (degrees)
+		self.joint1_angle_limits = (-170,170)
+		self.joint2_angle_limits = (-120,120)
+		self.joint3_angle_limits = (-170,170)
+		self.joint4_angle_limits = (-120,120)
+		self.joint5_angle_limits = (-170,170)
+		self.joint6_angle_limits = (-120,120)
+		self.joint7_angle_limits = (-175,175)
 
  		# Setting device to CPU
 		global device 
@@ -402,7 +422,7 @@ class PPO_gazebo:
 		effort: [-1.1170659660860227, -42.19300206382932, -0.28039639378316916, 30.654842491443432, -1.7280505378803077, -3.1108899151416978, 0.004992888739265563]
 		'''
 
-	def reward_from_state(self,state,control=None):
+	def reward_from_state(self,state,control):
 		'''Calculate reward based on state and control effort.
 
 		Params
@@ -427,14 +447,16 @@ class PPO_gazebo:
 		phi = state[15]
 		r_plate = -c2*(phi^2 + theta^2) #penalty for large plate angles
 
-		#calculated reward of control effort
-		if control:
+
+		if self.task == 1: # Position control
+			#TODO - loop through actions and determine if commanded joint angle exceeds physical limits,
+			# in which case apply a large negative reward for each exceedance
+			pass
+		elif self.task == 2: # Effort control
 			r_action = -c3*(np.dot(control,control)) #penalty for torque commands
-		else:
-			r_action = 0
 
 		#Total Reward
-		R = r_ball + r_plate + r_action
+		R = r_ball + r_plate + r_action 
 		
 		return R
 
@@ -451,10 +473,7 @@ class PPO_gazebo:
 
 		new_state = self.get_gazebo_state()
 
-		if self.task == 1:
-			reward = self.reward_from_state(new_state)
-		elif self.task == 2:
-			reward = self.reward_from_state(new_state,action)
+		reward = self.reward_from_state(new_state,action)
 
 		#Done if ball is on ground
 		if self.ball_state.link_state.pose.position.z <= 0.05:
@@ -484,15 +503,32 @@ class PPO_gazebo:
 		pause = rospy.ServiceProxy('/gazebo/pause_physics', Empty)
 		
 	def send_actions(self,actions):
-		# TODO need to know how many actions to publish, which joints in use, etc.
-		# ALSO TODO: see if publishers have a "receipt" ability to let you know when message was actually received?
-		self.pub_joint1.publish(actions[0])
-		self.pub_joint2.publish(actions[1])
-		self.pub_joint3.publish(actions[2])
-		self.pub_joint4.publish(actions[3])
-		self.pub_joint5.publish(actions[4])
-		self.pub_joint6.publish(actions[5])
-		self.pub_joint7.publish(actions[6])
+		# TODO: see if publishers have a "receipt" ability to let you know when message was actually received?
+
+		# j: joint index
+		# i: action index
+		# this loop maps actions to joints
+		i=0
+		for j in len(self.joints_in_use):
+			if self.joints_in_use[i] == True:
+				self.doPublish(j,actions[i])
+				i+=1
+
+	def doPublish(self,joint,action):
+		if joint == 0:
+			self.pub_joint1.publish(action)
+		elif joint == 1:
+			self.pub_joint2.publish(action)
+		elif joint == 2:
+			self.pub_joint3.publish(action)
+		elif joint == 3:
+			self.pub_joint4.publish(action)
+		elif joint == 4:
+			self.pub_joint5.publish(action)
+		elif joint == 5:
+			self.pub_joint6.publish(action)
+		elif joint == 6:
+			self.pub_joint7.publish(action)
 
 class ActorNN(nn.Module):
 	def __init__(self, input_dims, action_dims, alpha_A, fc1_dims, fc2_dims):
