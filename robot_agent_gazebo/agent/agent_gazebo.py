@@ -49,7 +49,7 @@ class PPO_gazebo:
 		# The task to solve, which affects the reward function
 		self.tasknum = task
 
-		# Debugging (I found that it's about 10x faster to run on a CPU than a GPU, which is counterintuitive and different from previous agents I've run. Will look into, but setting default device to be CPU for now)
+ 		# Setting device to CPU
 		global device 
 		device= 'cpu'
 
