@@ -32,6 +32,7 @@ class PPO_gazebo:
 		self.pub_joint7 = rospy.Publisher('/iiwa/EffortJointInterface_J7_controller/command', Float64, queue_size=10)
 		self.sub_joint_states = rospy.Subscriber("/iiwa/joint_states", JointState, self.subCB_joint_states)
 		
+		
 		self.ball_state = []
 		self.iiwa_link_0_state = []
 		self.iiwa_link_1_state = []
@@ -175,8 +176,7 @@ class PPO_gazebo:
 			ep_rewards = [] 
 			score = 0
 
-			self.gazebo_reset()				# reset gazebo enviroment
-			state = self.get_gazebo_state() # get initial state from gazebo
+			state = self.gazebo_reset()				# reset gazebo environment and get initial state
 			done = False
 
 			for ep_t in range(self.max_timesteps_per_episode):
@@ -465,9 +465,11 @@ class PPO_gazebo:
 
 
 	def gazebo_reset(self):
-		pass
-
-		#INSERT GAZEBO RESET HERE
+		rospy.wait_for_service('/gazebo/reset_simulation') 
+		rospy.ServiceProxy('/gazebo/reset_simulation', Empty)
+		state = get_gazebo_state()
+		
+		return state
 
 	def wait(self):
 		# TODO use rospy.rate or similar to wait for desired amount of time
