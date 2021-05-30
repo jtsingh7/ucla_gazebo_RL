@@ -12,7 +12,7 @@ if __name__ == '__main__':
 
 	#########################################################################################  SETUP  ##############################################################################################################
 	#Test or Train Flag
-	Train = False
+	Train = True
 	Test  = False
 
 	#Hyperparamters
@@ -46,7 +46,8 @@ if __name__ == '__main__':
 	#####################################################################################  EXECUTING ###############################################################################################################
 	#Create the Agent
 	agent = PPO_gazebo(task, timesteps_per_batch, max_timesteps_per_episode, n_updates_per_iteration, 
-			    gamma, alpha_A, alpha_C, clip, fc1_dims, fc2_dims, save_freq, load_previous_networks, PolicyNetwork_dir, CriticNetwork_dir)
+			    gamma, alpha_A, alpha_C, clip, fc1_dims, fc2_dims, save_freq, load_previous_networks, 
+			    PolicyNetwork_dir, CriticNetwork_dir,[False,False,True,True,True,True,True])
 
 	#Learn
 	if Train == True:
@@ -58,5 +59,4 @@ if __name__ == '__main__':
 		evaluate_trained_agent(PolicyNetwork_dir, env, alpha_A, fc1_dims, fc2_dims, render)
 	################################################################################################################################################################################################################
 
-	for i in range(0,2):
-		print(agent.get_gazebo_state())
+	

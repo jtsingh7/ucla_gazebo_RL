@@ -15,6 +15,8 @@ from sensor_msgs.msg import JointState
 from gazebo_msgs.srv import GetLinkState
 from gazebo_msgs.srv import GetModelState
 from tf.transformations import quaternion_matrix as rot
+from std_srvs.srv import Empty
+import pdb
 
 
 class PPO_gazebo:
@@ -26,6 +28,7 @@ class PPO_gazebo:
 		rospy.init_node('RL_agent')
 		self.task = task # The task to solve
 		self.joints_in_use = joints_in_use # this is a boolean 7-vector indicating which joints are in use for the problem
+		self.dt = 0.1 #sec
 
 		# Publishers and subscribers
 		if self.task == 1:
@@ -74,7 +77,7 @@ class PPO_gazebo:
 		device= 'cpu'
 
 		# Extract input
-		self.obs_dims = (10,)
+		self.obs_dims = (26,) # joint positions 1-7,joint velocities 1-7,plate theta,plate phi,plate xyz,ball xyz,ball velocity xyz,ball dist from plate center
 		self.action_dims = 7
 
 		# Hyperparameters
@@ -196,7 +199,7 @@ class PPO_gazebo:
 			ep_rewards = [] 
 			score = 0
 
-			state = self.gazebo_reset()				# reset gazebo environment and get initial state
+			state = self.gazebo_reset()	# reset gazebo environment and get initial state
 			done = False
 
 			for ep_t in range(self.max_timesteps_per_episode):
@@ -436,7 +439,7 @@ class PPO_gazebo:
 		#constants to be tuned
 		c1 = 1
 		c2 = 1
-		c3 = 1
+		c3 = 0
 
 		#calculated reward of ball position
 		ball_dist_from_plate_center = state[-1]
@@ -445,7 +448,8 @@ class PPO_gazebo:
 		#calculated reward of plate angle
 		theta = state[14]
 		phi = state[15]
-		r_plate = -c2*(phi^2 + theta^2) #penalty for large plate angles
+		
+		r_plate = -c2*(phi**2 + theta**2) #penalty for large plate angles
 
 
 		if self.task == 1: # Position control
@@ -489,14 +493,16 @@ class PPO_gazebo:
 		rospy.ServiceProxy('/gazebo/reset_simulation', Empty)
 		rospy.wait_for_service('/gazebo/unpause_physics')
 		rospy.ServiceProxy('/gazebo/unpause_physics', Empty)
-		
-		state = get_gazebo_state()
+
+		while not self.iiwa_joint_states:
+			print("Waiting for joint states...")
+
+		state = self.get_gazebo_state()
 		
 		return state
 
 	def wait(self):
-		# TODO use rospy.rate or similar to wait for desired amount of time
-		pass
+		rospy.sleep(self.dt)
 	
 	def pause(self):
 		rospy.wait_for_service('/gazebo/pause_physics')
@@ -509,8 +515,8 @@ class PPO_gazebo:
 		# i: action index
 		# this loop maps actions to joints
 		i=0
-		for j in len(self.joints_in_use):
-			if self.joints_in_use[i] == True:
+		for j in range(len(self.joints_in_use)):
+			if self.joints_in_use[j] == True:
 				self.doPublish(j,actions[i])
 				i+=1
 
