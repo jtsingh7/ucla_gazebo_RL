@@ -12,8 +12,8 @@ import rospy
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from std_msgs.msg import String, Float64
 from sensor_msgs.msg import JointState
-from gazebo_msgs.srv import GetLinkState
-from gazebo_msgs.srv import GetModelState
+from gazebo_msgs.msg import ModelState
+from gazebo_msgs.srv import GetLinkState, SetModelConfiguration, SetModelConfigurationRequest
 from tf.transformations import quaternion_matrix as rot
 from std_srvs.srv import Empty
 import pdb
@@ -489,10 +489,27 @@ class PPO_gazebo:
 
 
 	def gazebo_reset(self):
+
 		rospy.wait_for_service('/gazebo/reset_simulation') 
-		rospy.ServiceProxy('/gazebo/reset_simulation', Empty)
+		reset = rospy.ServiceProxy('/gazebo/reset_simulation', Empty)
+		reset()
+
+		rospy.wait_for_service('/gazebo/pause_physics')
+		pause = rospy.ServiceProxy('/gazebo/pause_physics', Empty)
+		pause()
+
+		rospy.wait_for_service('/gazebo/set_model_configuration')
+		config = rospy.ServiceProxy('/gazebo/set_model_configuration', SetModelConfiguration)
+		req = SetModelConfigurationRequest()
+		req.model_name = 'kuka_with_plate'
+		req.urdf_param_name = 'robot_description'
+		req.joint_names = ['iiwa_joint_1','iiwa_joint_2','iiwa_joint_3','iiwa_joint_4','iiwa_joint_5','iiwa_joint_6','iiwa_link_7']
+		req.joint_positions = [0,0.19634954084936207,0,-1.7671458676442586,0,-0.39269908169872414,0]
+		config(req)
+
 		rospy.wait_for_service('/gazebo/unpause_physics')
-		rospy.ServiceProxy('/gazebo/unpause_physics', Empty)
+		unpause = rospy.ServiceProxy('/gazebo/unpause_physics', Empty)
+		unpause()
 
 		while not self.iiwa_joint_states:
 			print("Waiting for joint states...")
