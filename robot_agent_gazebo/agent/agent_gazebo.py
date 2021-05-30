@@ -440,6 +440,7 @@ class PPO_gazebo:
 		c1 = 1
 		c2 = 1
 		c3 = 0
+		c4 = 1
 
 		#calculated reward of ball position
 		ball_dist_from_plate_center = state[-1]
@@ -459,8 +460,18 @@ class PPO_gazebo:
 		elif self.task == 2: # Effort control
 			r_action = -c3*(np.dot(control,control)) #penalty for torque commands
 
+			#TODO make the ball cartesian goal not hardcoded
+			xgoal=0.67
+			ygoal=0
+			zgoal=0.7
+			xerr = state[19] - xgoal
+			yerr = state[20] - ygoal
+			zerr = state[21] - zgoal
+
+			r_goal = -c4*(xerr**2 + yerr**2 + zerr**2)
+
 		#Total Reward
-		R = r_ball + r_plate + r_action 
+		R = r_ball + r_plate + r_action + r_goal
 		
 		return R
 
