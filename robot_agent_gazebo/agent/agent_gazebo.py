@@ -78,7 +78,11 @@ class PPO_gazebo:
 
 		# Extract input
 		self.obs_dims = (26,) # joint positions 1-7,joint velocities 1-7,plate theta,plate phi,plate xyz,ball xyz,ball velocity xyz,ball dist from plate center
-		self.action_dims = 7
+		a=0
+		for i in range(len(self.joints_in_use)):
+			if self.joints_in_use[i] == True:
+				a+=1
+		self.action_dims = a
 
 		# Hyperparameters
 		self.gamma = gamma
@@ -204,7 +208,7 @@ class PPO_gazebo:
 
 			for ep_t in range(self.max_timesteps_per_episode):
 				
-				t += 1 
+				t += 1
 				batch_obs.append(state)
 				action, log_prob = self.get_action(state)
 				state, reward, done = self.gazebo_step(action)
@@ -522,8 +526,10 @@ class PPO_gazebo:
 		unpause = rospy.ServiceProxy('/gazebo/unpause_physics', Empty)
 		unpause()
 
-		while not self.iiwa_joint_states:
+		if not self.iiwa_joint_states:
 			print("Waiting for joint states...")
+			while not self.iiwa_joint_states:
+				pass
 
 		state = self.get_gazebo_state()
 		
