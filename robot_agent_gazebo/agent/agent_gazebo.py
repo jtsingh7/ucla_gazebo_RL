@@ -13,7 +13,7 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from std_msgs.msg import String, Float64
 from sensor_msgs.msg import JointState
 from gazebo_msgs.msg import ModelState
-from gazebo_msgs.srv import GetLinkState, SetModelConfiguration, SetModelConfigurationRequest
+from gazebo_msgs.srv import GetLinkState, SetModelConfiguration, SetModelConfigurationRequest, ApplyBodyWrench
 from tf.transformations import quaternion_matrix as rot
 from std_srvs.srv import Empty
 import pdb
@@ -392,8 +392,8 @@ class PPO_gazebo:
 		theta_rad = np.arcsin(-hm[2,2])
 		phi_rad = np.arcsin(-hm[2,1])
 
-		theta_deg = theta_rad * (180/3.14159)
-		phi_deg = phi_rad * (180/3.14159)
+		theta_deg = theta_rad * (180/np.pi)
+		phi_deg = phi_rad * (180/np.pi)
 
 		return theta_deg, phi_deg
 
@@ -437,7 +437,7 @@ class PPO_gazebo:
 		state : np.array
 			array of [joint positions 1-7,joint velocities 1-7,plate roll,plate pitch,plate xyz,ball xyz,ball velocity xyz,ball dist from plate center]
 		control : np.array
-			if supplied, we are using torque commands as actions and thus it is a 7-vector
+			The position or effort commands, depending on task
 		'''
 
 		#constants to be tuned
@@ -445,6 +445,7 @@ class PPO_gazebo:
 		c2 = 1
 		c3 = 0
 		c4 = 1
+		c5 = 100
 
 		#calculated reward of ball position
 		ball_dist_from_plate_center = state[-1]
@@ -458,9 +459,11 @@ class PPO_gazebo:
 
 
 		if self.task == 1: # Position control
-			#TODO - loop through actions and determine if commanded joint angle exceeds physical limits,
-			# in which case apply a large negative reward for each exceedance
-			pass
+			
+			r_goal = 0
+			num_violations = self.check_position_limits(control)
+			r_action = -c5*num_violations
+
 		elif self.task == 2: # Effort control
 			r_action = -c3*(np.dot(control,control)) #penalty for torque commands
 
@@ -479,12 +482,54 @@ class PPO_gazebo:
 		
 		return R
 
+	def check_position_limits(self,commands):
+		num_violations = 0
+		i=0
+		for j in range(len(self.joints_in_use)):
+			if self.joints_in_use[j] == True:
+				action = commands[i]
+				lower, upper = self.get_joint_limits(j)
+				if action>upper or action<lower:
+					num_violations+=1
+				i+=1
+		return num_violations
+
+	def get_joint_limits(self,joint_num):
+		# returns joint limits (in radians)
+
+		c = np.pi/180
+
+		if joint_num == 0:
+			return c*self.joint1_angle_limits[0], c*self.joint1_angle_limits[1]
+
+		elif joint_num == 1:
+			return c*self.joint2_angle_limits[0], c*self.joint2_angle_limits[1]
+
+		elif joint_num == 2:
+			return c*self.joint3_angle_limits[0], c*self.joint3_angle_limits[1]
+
+		elif joint_num == 3:
+			return c*self.joint4_angle_limits[0], c*self.joint4_angle_limits[1]
+
+		elif joint_num == 4:
+			return c*self.joint5_angle_limits[0], c*self.joint5_angle_limits[1]
+
+		elif joint_num == 5:
+			return c*self.joint6_angle_limits[0], c*self.joint6_angle_limits[1]
+
+		elif joint_num == 6:
+			return c*self.joint7_angle_limits[0], c*self.joint7_angle_limits[1]
+
+
 	def gazebo_step(self,action):
 
 		# 1. Publish action
 		# 2. Wait small amount of time
 		# 3. Get new state
 		# 4. Calculate reward based on new state
+
+		if self.task == 1:
+			self.apply_wind()
 
 		self.send_actions(action)
 
@@ -519,7 +564,7 @@ class PPO_gazebo:
 		req.model_name = 'kuka_with_plate'
 		req.urdf_param_name = 'robot_description'
 		req.joint_names = ['iiwa_joint_1','iiwa_joint_2','iiwa_joint_3','iiwa_joint_4','iiwa_joint_5','iiwa_joint_6','iiwa_link_7']
-		req.joint_positions = [0,0.19634954084936207,0,-1.7671458676442586,0,-0.39269908169872414,0]
+		req.joint_positions = [0, 0.19634954084936207, 0, -1.7671458676442586, 0, -0.39269908169872414, 0]
 		config(req)
 
 		rospy.wait_for_service('/gazebo/unpause_physics')
@@ -570,6 +615,24 @@ class PPO_gazebo:
 		elif joint == 6:
 			self.pub_joint7.publish(action)
 
+	def apply_wind(self):
+		
+		x_coord = np.random.uniform(0,1)
+		y_coord = np.random.uniform(0,1)
+		z_coord = np.random.uniform(0,1)
+		norm = np.sqrt(x_coord**2 + y_coord**2 + z_coord**2)
+		x_coord = x_coord/norm
+		y_coord = y_coord/norm
+		z_coord = z_coord/norm
+		ref_pt = geometry_msgs.msg.Point(x = 0, y = 0, z = 0)
+		wrench = geometry_msgs.msg.Wrench(force = geometry_msgs.msg.Vector3( x = x_coord, y = y_coord, z = z_coord), torque = geometry_msgs.msg.Vector3( x = 0, y = 0, z = 0))
+		start_time = rospy.Time(secs = 0, nsecs = 0)
+		duration = rospy.Duration(secs = -1, nsecs = 0)
+		rospy.wait_for_service('/gazebo/apply_body_wrench')
+		apply_force = rospy.ServiceProxy('/gazebo/apply_body_wrench', ApplyBodyWrench)
+		apply_force('ball', 'world', ref_pt, wrench, start_time, duration)
+
+
 class ActorNN(nn.Module):
 	def __init__(self, input_dims, action_dims, alpha_A, fc1_dims, fc2_dims):
 		super(ActorNN, self).__init__()
@@ -592,8 +655,6 @@ class ActorNN(nn.Module):
 
 		mean_actions = self.actor(state)
 		return mean_actions
-
-
 
 
 class CriticNN(nn.Module):
