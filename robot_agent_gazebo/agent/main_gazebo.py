@@ -33,7 +33,7 @@ if __name__ == '__main__':
 	total_learn_timesteps = 500_000_000    #Total timesteps to learn before exiting training loop, typically set to a high number to continue learning indefinitely
 	PolicyNetwork_dir = os.getcwd() + '\\Networks\\ppo_actor.pth'
 	CriticNetwork_dir = os.getcwd() + '\\Networks\\ppo_critic.pth'
-	figure_file = 'plots/' + 'arm' + '.png' #will need to create plots folder before running
+	figure_file = os.getcwd() + '\\plots\\' + 'arm' + '.png' #will need to create plots folder before running
 
 	################################################################################################################################################################################################################
 
@@ -47,12 +47,11 @@ if __name__ == '__main__':
 	#Create the Agent
 	agent = PPO_gazebo(task, timesteps_per_batch, max_timesteps_per_episode, n_updates_per_iteration, 
 			    gamma, alpha_A, alpha_C, clip, fc1_dims, fc2_dims, save_freq, load_previous_networks, 
-			    PolicyNetwork_dir, CriticNetwork_dir,[False,False,True,True,True,True,True])
+			    PolicyNetwork_dir, CriticNetwork_dir, figure_file, [False,False,True,True,True,True,True])
 
 	#Learn
 	if Train == True:
 		agent.learn(total_timesteps=total_learn_timesteps)
-		agent.plot_training(figure_file)
 
 	#Test
 	if Test == True:

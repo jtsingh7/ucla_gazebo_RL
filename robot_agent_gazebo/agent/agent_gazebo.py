@@ -22,7 +22,7 @@ import pdb
 class PPO_gazebo:
 	def __init__(self,task,timesteps_per_batch, max_timesteps_per_episode, n_updates_per_iteration, 
 			    gamma, alpha_A, alpha_C, clip, fc1_dims, fc2_dims, save_freq, load_previous_networks, 
-			    PolicyNetwork_dir, CriticNetwork_dir, joints_in_use=[True,True,True,True,True,True,True]):
+			    PolicyNetwork_dir, CriticNetwork_dir, figure_file, joints_in_use=[True,True,True,True,True,True,True]):
 
 		# ROS-related initialization
 		rospy.init_node('RL_agent')
@@ -95,6 +95,9 @@ class PPO_gazebo:
 		self.max_timesteps_per_episode = max_timesteps_per_episode
 		self.n_updates_per_iteration = n_updates_per_iteration
 		self.save_freq = save_freq
+		self.PolicyNetwork_dir = PolicyNetwork_dir
+		self.CriticNetwork_dir = CriticNetwork_dir
+		self.figure_file = figure_file
 		self.score_history = []
 
 		# Initialize actor and critic networks
@@ -177,13 +180,13 @@ class PPO_gazebo:
 			# Print training summary
 			self._log_summary()
 
-			# Save our model if it's time
+			# Save our model and plot 
 			if i_so_far % self.save_freq == 0:
 				print('Saving Networks')
-				actor_network_dir = os.getcwd() + '\\Networks\\ppo_actor.pth'
-				critic_network_dir = os.getcwd() + '\\Networks\\ppo_critic.pth'
-				T.save(self.actor.state_dict(), actor_network_dir)
-				T.save(self.critic.state_dict(), critic_network_dir)
+				T.save(self.actor.state_dict(), self.PolicyNetwork_dir)
+				T.save(self.critic.state_dict(), self.CriticNetwork_dir)
+				print('Plotting Figure')
+				self.plot_training(self.figure_file)
 
 	def rollout(self):
 
