@@ -3,6 +3,17 @@
 <!-- A basic world for RL training (task 1, position control and wind disturbance) -->
 <sdf version="1.6">
 	<world name="default">
+		
+		<!-- setting ode max step size -->
+		<physics type="ode">
+			<ode>
+        			<solver>
+          				<type>quick</type>
+        			</solver>
+        		</ode>
+			<max_step_size>0.005</max_step_size>
+		</physics>
+		
 
 		<!--Sunlight (without physical sun model)-->
 		<include>
