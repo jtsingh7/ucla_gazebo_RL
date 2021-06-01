@@ -210,7 +210,7 @@ class PPO_gazebo:
 				t += 1
 				batch_obs.append(state)
 				action_scaled, action, log_prob = self.get_action(state)
-				state, reward, done, _ = self.env.step(action_scaled)
+				state, reward, done = self.gazebo_step(action_scaled)
 				score =+ reward
 				ep_rewards.append(reward)
 				batch_acts.append(action)
@@ -269,6 +269,8 @@ class PPO_gazebo:
 					low, high = self.get_joint_limits(j)
 					action_low.append(low)
 					action_high.append(high)
+			action_low = np.array(action_low)
+			action_high = np.array(action_high)
 		if self.task == 2:
 			#TODO
 			pass
