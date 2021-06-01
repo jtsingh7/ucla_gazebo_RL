@@ -6,7 +6,7 @@ import time
 import torch as T
 import torch.nn as nn
 import torch.optim as optim
-from torch.distributions import MultivariateNormal
+from torch.distributions import Beta
 import matplotlib.pyplot as plt
 import rospy
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
@@ -111,10 +111,6 @@ class PPO_gazebo:
 				print('No previous networks to load. Continuing from scratch')
 		self.device = T.device(device if T.cuda.is_available() else 'cpu')
 
-		# Initialize the covariance matrix used to query the actor for actions
-		self.cov_var = T.full(size=(self.action_dims,), fill_value=0.5)
-		self.cov_mat = T.diag(self.cov_var).to(self.device)
-
 		# Logger
 		self.logger = {
 			'delta_t': time.time_ns(),
@@ -213,8 +209,8 @@ class PPO_gazebo:
 				
 				t += 1
 				batch_obs.append(state)
-				action, log_prob = self.get_action(state)
-				state, reward, done = self.gazebo_step(action)
+				action_scaled, action, log_prob = self.get_action(state)
+				state, reward, done, _ = self.env.step(action_scaled)
 				score =+ reward
 				ep_rewards.append(reward)
 				batch_acts.append(action)
@@ -259,21 +255,38 @@ class PPO_gazebo:
 
 	def get_action(self, state):
 
-		mean_actions = self.actor(state)
-		policy_dist = MultivariateNormal(mean_actions, self.cov_mat)
+		alpha, beta = self.actor(state)
+		policy_dist = Beta(alpha, beta)
 		action = policy_dist.sample()
-		log_prob = policy_dist.log_prob(action)
+		log_prob = policy_dist.log_prob(action).sum(-1) #summing log prob for each action sampled
+
+		if self.task == 1:
+			#Map Action to joint position command range
+			action_low = []
+			action_high = []
+			for j in range(len(self.joints_in_use)):
+				if self.joints_in_use[j] == True:
+					low, high = self.get_joint_limits(j)
+					action_low.append(low)
+					action_high.append(high)
+		if self.task == 2:
+			#TODO
+			pass
+
+		action_scaled = ((action)/(1))*(action_high - action_low) + action_low
+
+		# Returns the action and the scaled action. The action is used for computing the log prob, and the scaled action is used in the environmnet
 		try:
-			return action.detach().numpy(), log_prob.detach()
+			return action_scaled.detach().numpy(), action.detach().numpy(), log_prob.detach()
 		except:
-			return action.cpu().detach().numpy(), log_prob.detach()
+			return action_scaled.cpu().detach().numpy(), action.cpu().detach().numpy(), log_prob.detach()
 
 	def evaluate(self, batch_obs, batch_acts):
 		V = self.critic(batch_obs).squeeze()
 
-		mean_actions = self.actor(batch_obs)
-		policy_dist = MultivariateNormal(mean_actions, self.cov_mat)
-		log_probs = policy_dist.log_prob(batch_acts)
+		alpha, beta = self.actor(batch_obs)
+		policy_dist = Beta(alpha, beta)
+		log_probs = policy_dist.log_prob(batch_acts).sum(-1) #summing log prob for each action sampled
 
 		return V, log_probs
 
@@ -645,12 +658,16 @@ class PPO_gazebo:
 class ActorNN(nn.Module):
 	def __init__(self, input_dims, action_dims, alpha_A, fc1_dims, fc2_dims):
 		super(ActorNN, self).__init__()
+		self.action_dims = action_dims
 		self.actor = nn.Sequential(
                      nn.Linear(*input_dims, fc1_dims), 
                      nn.ReLU(),
                      nn.Linear(fc1_dims, fc2_dims),
                      nn.ReLU(),
                      nn.Linear(fc2_dims, action_dims),
+		     nn.Softplus(),
+		     nn.Linear(action_dims, action_dims),
+		     nn.Softplus()
                      )
 
 		self.optimizer = optim.Adam(self.parameters(), lr=alpha_A)
@@ -661,10 +678,19 @@ class ActorNN(nn.Module):
 	def forward(self, state):
 		if isinstance(state, np.ndarray):
 			state = T.tensor(state, dtype=T.float).to(self.device)
+		# Alpha from second to last layer
+		state_alpha = state
+		for layer in range(len(self.actor)):
+			state_alpha = self.actor[layer](state_alpha)
+			if layer == 5:
+				alpha = state_alpha
+				break
+		# Beta from last layer
+		beta = self.actor(state)
+			
+		return alpha, beta
 
-		mean_actions = self.actor(state)
-		return mean_actions
-
+	
 
 class CriticNN(nn.Module):
 	def __init__(self, input_dims, alpha_C, fc1_dims, fc2_dims):
