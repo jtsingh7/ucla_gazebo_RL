@@ -449,6 +449,8 @@ class PPO_gazebo:
 		c3 = 0
 		c4 = 1
 		c5 = 100
+		c6 = 100 #floor gain
+		c7 = 15  #floor shape
 
 		#calculated reward of ball position
 		ball_dist_from_plate_center = state[-1]
@@ -479,9 +481,13 @@ class PPO_gazebo:
 			zerr = state[21] - zgoal
 
 			r_goal = -c4*(xerr**2 + yerr**2 + zerr**2)
+			
+		#calculated Floor Penalty 
+		#Description: At heights >0.3, Reward is ~0. At heights ~0.3, Reward is ~-1. Rapid dropoff with max negative reward of ~-50 at the min ball height of ~0.05
+		r_floor = -c6*np.exp(-c7*self.ball_state.link_state.pose.position.z)
 
 		#Total Reward
-		R = r_ball + r_plate + r_action + r_goal
+		R = r_ball + r_plate + r_action + r_goal + r_floor
 		
 		return R
 
