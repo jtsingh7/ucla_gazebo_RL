@@ -17,6 +17,7 @@ from gazebo_msgs.srv import GetLinkState, SetModelConfiguration, SetModelConfigu
 from tf.transformations import quaternion_matrix as rot
 from std_srvs.srv import Empty
 import pdb
+import geometry_msgs
 
 
 class PPO_gazebo:
@@ -651,7 +652,7 @@ class PPO_gazebo:
 		ref_pt = geometry_msgs.msg.Point(x = 0, y = 0, z = 0)
 		wrench = geometry_msgs.msg.Wrench(force = geometry_msgs.msg.Vector3( x = x_coord, y = y_coord, z = z_coord), torque = geometry_msgs.msg.Vector3( x = 0, y = 0, z = 0))
 		start_time = rospy.Time(secs = 0, nsecs = 0)
-		duration = rospy.Duration(secs = -1, nsecs = 0)
+		duration = rospy.Duration(secs = 0.1, nsecs = 0)
 		rospy.wait_for_service('/gazebo/apply_body_wrench')
 		apply_force = rospy.ServiceProxy('/gazebo/apply_body_wrench', ApplyBodyWrench)
 		apply_force('ball', 'world', ref_pt, wrench, start_time, duration)
