@@ -461,49 +461,49 @@ class PPO_gazebo:
 
 		#constants to be tuned
 		c1 = 1
-		c2 = 1
-		c3 = 0
-		c4 = 1
-		c5 = 100
-		c6 = 100 #floor gain
-		c7 = 15  #floor shape
+		#c2 = 1
+		#c3 = 0
+		#c4 = 1
+		#c5 = 100
+		#c6 = 100 #floor gain
+		#c7 = 15  #floor shape
 
 		#calculated reward of ball position
 		ball_dist_from_plate_center = state[-1]
 		r_ball = np.exp(-c1*(ball_dist_from_plate_center)) #larger penalty for larger distances from center of plate
 
 		#calculated reward of plate angle
-		theta = state[14]
-		phi = state[15]
+		#theta = state[14]
+		#phi = state[15]
 		
-		r_plate = -c2*(phi**2 + theta**2) #penalty for large plate angles
+		#r_plate = -c2*(phi**2 + theta**2) #penalty for large plate angles
 
 
-		if self.task == 1: # Position control
+		#if self.task == 1: # Position control
 			
-			r_goal = 0
-			num_violations = self.check_position_limits(control)
-			r_action = -c5*num_violations
+		#	r_goal = 0
+		#	num_violations = self.check_position_limits(control)
+		#	r_action = -c5*num_violations
 
-		elif self.task == 2: # Effort control
-			r_action = -c3*(np.dot(control,control)) #penalty for torque commands
+		#elif self.task == 2: # Effort control
+		#	r_action = -c3*(np.dot(control,control)) #penalty for torque commands
 
 			#TODO make the ball cartesian goal not hardcoded
-			xgoal=0.67
-			ygoal=0
-			zgoal=0.7
-			xerr = state[19] - xgoal
-			yerr = state[20] - ygoal
-			zerr = state[21] - zgoal
+		#	xgoal=0.67
+		#	ygoal=0
+		#	zgoal=0.7
+		#	xerr = state[19] - xgoal
+		#	yerr = state[20] - ygoal
+		#	zerr = state[21] - zgoal
 
-			r_goal = -c4*(xerr**2 + yerr**2 + zerr**2)
+		#	r_goal = -c4*(xerr**2 + yerr**2 + zerr**2)
 			
 		#calculated Floor Penalty 
 		#Description: At heights >0.3, Reward is ~0. At heights ~0.3, Reward is ~-1. Rapid dropoff with max negative reward of ~-50 at the min ball height of ~0.05
-		r_floor = -c6*np.exp(-c7*self.ball_state.link_state.pose.position.z)
+		#r_floor = -c6*np.exp(-c7*self.ball_state.link_state.pose.position.z)
 
 		#Total Reward
-		R = r_ball + r_plate + r_action + r_goal + r_floor
+		R = r_ball 
 		
 		return R
 
