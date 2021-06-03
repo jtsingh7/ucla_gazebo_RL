@@ -84,7 +84,16 @@ class PPO_gazebo:
 			if self.joints_in_use[i] == True:
 				a+=1
 		self.action_dims = a
-
+		
+		# Define upper and lower bound joint effort commands (found empirically to provide 'good' behavior)
+		scaling_array = np.ones(self.action_dims)
+		scaling_array[-1] = 5
+		scaling_array[-2] = 5
+		scaling_array[-3] = 5
+		scaling_array[-4] = 75	
+		self.effort_lower_bound = -1*np.ones(self.action_dims)*scaling_array
+		self.effort_upper_bound = 1*np.ones(self.action_dims)*scaling_array
+		
 		# Hyperparameters
 		self.gamma = gamma
 		self.alpha_A = alpha_A
@@ -273,8 +282,8 @@ class PPO_gazebo:
 			action_low = np.array(action_low)
 			action_high = np.array(action_high)
 		if self.task == 2:
-			#TODO
-			pass
+			action_low = self.effort_lower_bound
+			action_high = self.effort_upper_bound
 
 		action_scaled = ((action)/(1))*(action_high - action_low) + action_low
 
