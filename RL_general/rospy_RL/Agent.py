@@ -1,19 +1,18 @@
 #!/usr/bin/python3
 
 import os
-import time
 import numpy as np
 import time
 import torch as T
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import MultivariateNormal
+import matplotlib.pyplot as plt
 import rospy
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-from std_msgs.msg import String
+from std_msgs.msg import String, Float64
 from sensor_msgs.msg import JointState
-from gazebo_msgs.srv import GetLinkState
-from gazebo_msgs.srv import ApplyBodyWrench
+from gazebo_msgs.srv import GetLinkState, SetModelConfiguration, SetModelConfigurationRequest, ApplyBodyWrench
 from datetime import datetime
 from std_srvs.srv import Empty
 import geometry_msgs.msg
@@ -21,24 +20,54 @@ import geometry_msgs.msg
 #ROS Commands
 class jointStates():
     def __init__(self):
-        self.jointP = np.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0])
+        self.jointP = np.array([0.0,0.0,0.0,0.0,0.0])
 s = jointStates()
 def subCB(data):                                                                                                                  #copied from kuka_teleop.py, may need editing
-    s.jointP=np.array(list(data.position))
-def get_jt(jtp_list,t):
-    jtp_list = jtp_list + s.jointP
-    jt = JointTrajectory()
-    jt.joint_names = ["iiwa_joint_1","iiwa_joint_2","iiwa_joint_3","iiwa_joint_4","iiwa_joint_5","iiwa_joint_6","iiwa_joint_7"]
-    jtp = JointTrajectoryPoint()
-    jtp.positions = jtp_list
-    jtp.time_from_start = rospy.Duration.from_sec(t)
-    jt.points.append(jtp)
-    return jt
+	sevenJ = np.array(list(data.position))
+	s.jointP= sevenJ[2:7]
+# def get_jt(jtp_list,t):
+#     jtp_list = jtp_list + s.jointP
+#     jt = JointTrajectory()
+#     jt.joint_names = ["iiwa_joint_1","iiwa_joint_2","iiwa_joint_3","iiwa_joint_4","iiwa_joint_5","iiwa_joint_6","iiwa_joint_7"]
+#     jtp = JointTrajectoryPoint()
+#     jtp.positions = jtp_list
+#     jtp.time_from_start = rospy.Duration.from_sec(t)
+#     jt.points.append(jtp)
+#     return jt
+def doPublish(jtp,pub_joint1,pub_joint2,pub_joint3,pub_joint4,pub_joint5,pub_joint6,pub_joint7):
+    jtp = jtp + s.jointP
+    #m1 = Float64()
+    #m2 = Float64()
+    m3 = Float64()
+    m4 = Float64()
+    m5 = Float64()
+    m6 = Float64()
+    m7 = Float64()
+    #m1.data = jtp[0]
+    #m2.data = jtp[1]
+    m3.data = jtp[0]
+    m4.data = jtp[1]
+    m5.data = jtp[2]
+    m6.data = jtp[3]
+    m7.data = jtp[4]
+    #pub_joint1.publish(m1)
+    #pub_joint2.publish(m2)
+    pub_joint3.publish(m3)
+    pub_joint4.publish(m4)
+    pub_joint5.publish(m5)
+    pub_joint6.publish(m6)
+    pub_joint7.publish(m7)
 
-pubJoint = rospy.Publisher('/iiwa/PositionJointInterface_trajectory_controller/command', JointTrajectory, queue_size=10)                                           #publish ball position???????idk
-subJoint = rospy.Subscriber("/iiwa/joint_states", JointState, subCB)
+rospy.init_node('iiwa_joint_teleop')
+pub_joint1 = rospy.Publisher('/iiwa/EffortJointInterface_J1_controller/command', Float64, queue_size=10)
+pub_joint2 = rospy.Publisher('/iiwa/EffortJointInterface_J2_controller/command', Float64, queue_size=10)
+pub_joint3 = rospy.Publisher('/iiwa/EffortJointInterface_J3_controller/command', Float64, queue_size=10)
+pub_joint4 = rospy.Publisher('/iiwa/EffortJointInterface_J4_controller/command', Float64, queue_size=10)
+pub_joint5 = rospy.Publisher('/iiwa/EffortJointInterface_J5_controller/command', Float64, queue_size=10)
+pub_joint6 = rospy.Publisher('/iiwa/EffortJointInterface_J6_controller/command', Float64, queue_size=10)
+pub_joint7 = rospy.Publisher('/iiwa/EffortJointInterface_J7_controller/command', Float64, queue_size=10)
+sub = rospy.Subscriber("/iiwa/joint_states", JointState, subCB)
 state_ros = rospy.ServiceProxy('/gazebo/get_link_state', GetLinkState)
-rospy.init_node('iiwa_joints', anonymous=True)
 # rospy.spin()
 reset_simulation = rospy.ServiceProxy('/gazebo/reset_simulation', Empty)
 unpause = rospy.ServiceProxy('/gazebo/unpause_physics', Empty)
@@ -46,15 +75,14 @@ pause = rospy.ServiceProxy('/gazebo/pause_physics', Empty)
 apply_force = rospy.ServiceProxy('/gazebo/apply_body_wrench', ApplyBodyWrench)
 
 class PPO:
-	def __init__(self, timesteps_per_batch, max_timesteps_per_episode, n_updates_per_iteration, gamma, alpha_A, alpha_C, clip, fc1_dims, fc2_dims, render, render_every_i, save_freq, load_previous_networks, PolicyNetwork_dir, CriticNetwork_dir):
+	def __init__(self, timesteps_per_batch, max_timesteps_per_episode, n_updates_per_iteration, gamma, alpha_A, alpha_C, clip, fc1_dims, fc2_dims, render, render_every_i, save_freq, load_previous_networks, PolicyNetwork_dir, CriticNetwork_dir, figure_file):
 
 		#Debugging (I found that it's about 10x faster to run on a CPU than a GPU, which is counterintuitive and different from previous agents I've run. Will look into, but setting default device to be CPU for now)
 		global device
 		device= 'cpu'
 
 		# Extract input
-		self.obs_dims = 10
-		self.action_dims = 7
+		self.obs_dims = 14
 		self.gamma = gamma
 		self.alpha_A = alpha_A
 		self.alpha_C = alpha_C
@@ -67,6 +95,25 @@ class PPO:
 		self.render = render
 		self.render_every_i = render_every_i
 		self.save_freq = save_freq
+		self.PolicyNetwork_dir = PolicyNetwork_dir
+		self.CriticNetwork_dir = CriticNetwork_dir
+		self.figure_file = figure_file
+		self.score_history = []
+
+		# Kuka joint limits (degrees)
+		self.joint1_angle_limits = (-170,170)
+		self.joint2_angle_limits = (-120,120)
+		self.joint3_angle_limits = (-170,170)
+		self.joint4_angle_limits = (-120,120)
+		self.joint5_angle_limits = (-170,170)
+		self.joint6_angle_limits = (-120,120)
+		self.joint7_angle_limits = (-175,175)
+		self.joints_in_use = [False,False,True,True,True,True,True]
+		a=0
+		for i in range(len(self.joints_in_use)):
+			if self.joints_in_use[i] == True:
+				a+=1
+		self.action_dims = a
 
 		# Initialize actor and critic networks
 		self.actor = ActorNN(input_dims=self.obs_dims, action_dims=self.action_dims, alpha_A=self.alpha_A, fc1_dims=self.fc1_dims, fc2_dims=self.fc2_dims)                                                   # ALG STEP 1
@@ -78,6 +125,9 @@ class PPO:
 			except:
 				print('No previous networks to load. Continuing from scratch')
 		self.device = T.device(device if T.cuda.is_available() else 'cpu')
+		with open("score_hist.txt", "r") as f:
+			for line in f:
+				self.score_history.append(float(line.strip()))
 
 		# Initialize the covariance matrix used to query the actor for actions
 		self.cov_var = T.full(size=(self.action_dims,), fill_value=0.5)
@@ -97,8 +147,10 @@ class PPO:
 		t_so_far = 0 # Timesteps simulated so far
 		i_so_far = 0 # Iterations of learning so far
 		while t_so_far < total_timesteps:                                                                       # ALG STEP 2
+			print('i_so_far')
+			print(i_so_far)
 			batch_obs, batch_acts, batch_log_probs, batch_rtgs, batch_lens = self.rollout()                     # ALG STEP 3
-
+			print('rollout done')
 			# Calculate how many timesteps we collected this batch
 			t_so_far += np.sum(batch_lens)
 
@@ -151,10 +203,14 @@ class PPO:
 			# Save our model if it's time
 			if i_so_far % self.save_freq == 0:
 				print('Saving Networks')
-				actor_network_dir = os.getcwd() + '\\Networks\\ppo_actor.pth'
-				critic_network_dir = os.getcwd() + '\\Networks\\ppo_critic.pth'
-				T.save(self.actor.state_dict(), actor_network_dir)
-				T.save(self.critic.state_dict(), critic_network_dir)
+				T.save(self.actor.state_dict(), self.PolicyNetwork_dir)
+				T.save(self.critic.state_dict(), self.CriticNetwork_dir)
+				#print('Plotting Figure')
+				#self.plot_training(self.figure_file)
+				print('Saving score history')
+				with open("score_hist.txt", "w") as f:
+					for s in self.score_history:
+						f.write(str(s) +"\n")
 
 	def rollout(self):
 		batch_obs = []
@@ -167,12 +223,12 @@ class PPO:
 		t = 0
 		#Creating the batch of data
 		while t < self.timesteps_per_batch:
+			score = 0
 			ep_rewards = []
-			rospy.wait_for_service('/gazebo/reset_simulation')
-			reset_simulation()
+			self.reset()
 			rospy.wait_for_service('/gazebo/unpause_physics')
 			unpause()
-            self.apply_wind()
+			#self.apply_wind()
 			state = self.get_state()
 			done = False
 			for ep_t in range(self.max_timesteps_per_episode):
@@ -181,17 +237,22 @@ class PPO:
 				batch_obs.append(state)
 				action, log_prob = self.get_action(state)
 				state, reward, done = self.step(action)
+				score =+ reward
 				ep_rewards.append(reward)
 				batch_acts.append(action)
 				batch_log_probs.append(log_prob)
 				if done:
 					rospy.wait_for_service('/gazebo/pause_physics')
 					pause()
+					print('done')
 					break
+
+			# Track score history for plotting (total reward for each episode)
+			self.score_history.append(score)
 			# Track episodic lengths and rewards
 			batch_lens.append(ep_t + 1)
 			batch_rews.append(ep_rewards)
-
+		print('batch done')
 		# Reshape data as tensors in the shape specified in function description, before returning
 		batch_obs = T.tensor(batch_obs, dtype=T.float).to(self.device)
 		batch_acts = T.tensor(batch_acts, dtype=T.float).to(self.device)
@@ -215,11 +276,50 @@ class PPO:
 
 		return batch_rtgs
 
+	def get_joint_limits(self,joint_num):
+			# returns joint limits (in radians)
+		c = np.pi/180
+
+		if joint_num == 0:
+			return c*self.joint1_angle_limits[0], c*self.joint1_angle_limits[1]
+
+		elif joint_num == 1:
+			return c*self.joint2_angle_limits[0], c*self.joint2_angle_limits[1]
+
+		elif joint_num == 2:
+			return c*self.joint3_angle_limits[0], c*self.joint3_angle_limits[1]
+
+		elif joint_num == 3:
+			return c*self.joint4_angle_limits[0], c*self.joint4_angle_limits[1]
+
+		elif joint_num == 4:
+			return c*self.joint5_angle_limits[0], c*self.joint5_angle_limits[1]
+
+		elif joint_num == 5:
+			return c*self.joint6_angle_limits[0], c*self.joint6_angle_limits[1]
+
+		elif joint_num == 6:
+			return c*self.joint7_angle_limits[0], c*self.joint7_angle_limits[1]
+
+
 	def get_action(self, state):
+		#print(s.jointP)
 		mean_actions = self.actor(state)
 		policy_dist = MultivariateNormal(mean_actions, self.cov_mat)
 		action = policy_dist.sample()
 		log_prob = policy_dist.log_prob(action)
+		#Map Action to joint position command range
+		#action_low = []
+		#action_high = []
+		#for j in range(len(self.joints_in_use)):
+		#	if self.joints_in_use[j] == True:
+		#		low, high = self.get_joint_limits(j)
+		#		action_low.append(low)
+		#		action_high.append(high)
+		#action_low = np.array(action_low)
+		#action_high = np.array(action_high)
+		#action_scaled = ((action)/(1))*(action_high - action_low) + action_low
+		# Returns the action and the scaled action. The action is used for computing the log prob, and the scaled action is used in the environmnet
 		try:
 			return action.detach().numpy(), log_prob.detach()
 		except:
@@ -230,26 +330,56 @@ class PPO:
 		# jt = get_jt(jtp,1)
 		# jt = np.array(jt.points[0].positions)
 		#State is 7 joint angles + 3 coords for ball
+		state_ros = rospy.ServiceProxy('/gazebo/get_link_state', GetLinkState)
 		rospy.wait_for_service('/gazebo/get_link_state')
-		od = state_ros('ball', 'iiwa_link_7')
-		x = od.link_state.pose.position.x
-		y = od.link_state.pose.position.y
-		z = od.link_state.pose.position.z
-		state = np.append(s.jointP,np.array([x,y,z]))
+		print('post link srvice')
+		ball_od = state_ros('ball', 'world')				#relative to plate: replace world with iiwa_link_7
+		print('got ball_od')
+		plate_od = state_ros('iiwa_link_7', 'world')
+		print('got plate_od')
+		plx = plate_od.link_state.pose.position.x
+		ply = plate_od.link_state.pose.position.y
+		plz = plate_od.link_state.pose.position.z
+		vx = ball_od.link_state.twist.linear.x
+		vy = ball_od.link_state.twist.linear.y
+		vz = ball_od.link_state.twist.linear.z
+		x = ball_od.link_state.pose.position.x
+		y = ball_od.link_state.pose.position.y
+		z = ball_od.link_state.pose.position.z
+		state = np.append(s.jointP,np.array([plx,ply,plz,vx,vy,vz,x,y,z]))
+		#print('state:')
 		print(state)
 		return state
 
+	def reset(self):
+		rospy.wait_for_service('/gazebo/reset_simulation')
+		reset_simulation()
+
+		config = rospy.ServiceProxy('/gazebo/set_model_configuration', SetModelConfiguration)
+		rospy.wait_for_service('/gazebo/set_model_configuration')
+		req = SetModelConfigurationRequest()
+		req.model_name = 'kuka_with_plate'
+		req.urdf_param_name = 'robot_description'
+		req.joint_names = ['iiwa_joint_1','iiwa_joint_2','iiwa_joint_3','iiwa_joint_4','iiwa_joint_5','iiwa_joint_6','iiwa_link_7']
+		req.joint_positions = [0, 0.19634954084936207, 0, -1.7671458676442586, 0, -0.39269908169872414, 0]
+		config(req)
+		#print(s.jointP)
+		#doPublish([0.0, -1.7671458676442586, 0.0, -0.39269908169872414, 0.0],pub_joint1,pub_joint2,pub_joint3,pub_joint4,pub_joint5,pub_joint6,pub_joint7)		#[0.0, 0.19634954084936207, 0.0, -1.7671458676442586, 0.0, -0.39269908169872414, 0.0]
+
 	def take_action(self,action):
+		#print('action')
 		#print(action)
-		jt = get_jt(action,1)
-		pubJoint.publish(jt)
+		doPublish(action,pub_joint1,pub_joint2,pub_joint3,pub_joint4,pub_joint5,pub_joint6,pub_joint7)
 
 	def step(self,action):
 		done = False
 		curr_state = self.get_state()
 		self.take_action(action)
+		#print('pre-sleep')
+		#rospy.sleep(0.01)
+		#print('post-sleep')
 		new_state = self.get_state()
-		reward = np.sqrt(new_state[-1]**2+new_state[-2]**2+new_state[-3]**2)			#last 3 values in state vector are cartisian coords of ball
+		reward = -np.sqrt(new_state[-1]**2+new_state[-2]**2+new_state[-3]**2)			#last 3 values in state vector are cartisian coords of ball
 		if new_state[-1] <= 0.06:                                                                  #if ball falls below z=0, terminate episode
 			reward -= 100
 			done = True
@@ -264,20 +394,20 @@ class PPO:
 
 		return V, log_probs
 
-    def apply_wind():
-        x_coord = np.random.uniform(0,1)
-        y_coord = np.random.uniform(0,1)
-        z_coord = np.random.uniform(0,1)
-        norm = np.sqrt(x_coord**2+y_coord**2+z_coord**2)
-        x_coord = x_coord/norm
-        y_coord = y_coord/norm
-        z_coord = z_coord/norm
-        ref_pt = geometry_msgs.msg.Point(x = 0, y = 0, z = 0
-        wrench = geometry_msgs.msg.Wrench(force = geometry_msgs.msg.Vector3( x = x_coord, y = y_coord, z = z_coord), torque = geometry_msgs.msg.Vector3( x = 0, y = 0, z = 0))
-        start_time = rospy.Time(secs = 0, nsecs = 0)
-        duration = rospy.Duration(secs = -1, nsecs = 0)
-        rospy.wait_for_service('/gazebo/apply_body_wrench')
-        apply_force('ball', 'world', ref_pt, wrench, start_time, duration)
+	def apply_wind(self):
+		x_coord = np.random.uniform(0,1)
+		y_coord = np.random.uniform(0,1)
+		z_coord = np.random.uniform(0,1)
+		norm = np.sqrt(x_coord**2+y_coord**2+z_coord**2)
+		x_coord = x_coord/norm
+		y_coord = y_coord/norm
+		z_coord = z_coord/norm
+		ref_pt = geometry_msgs.msg.Point(x = 0, y = 0, z = 0)
+		wrench = geometry_msgs.msg.Wrench(force = geometry_msgs.msg.Vector3( x = x_coord, y = y_coord, z = z_coord), torque = geometry_msgs.msg.Vector3( x = 0, y = 0, z = 0))
+		start_time = rospy.Time(secs = 0, nsecs = 0)
+		duration = rospy.Duration(secs = 2, nsecs = 0)
+		rospy.wait_for_service('/gazebo/apply_body_wrench')
+		apply_force('ball', 'world', ref_pt, wrench, start_time, duration)
 
 	def _log_summary(self):
 
@@ -312,6 +442,22 @@ class PPO:
 		self.logger['batch_lens'] = []
 		self.logger['batch_rews'] = []
 		self.logger['actor_losses'] = []
+
+	def plot_training(self, filename):
+		running_avg = np.zeros(len(self.score_history))
+		bucket = 100
+		for i in range(len(running_avg)):
+			running_avg[i] = np.mean(self.score_history[max(0, i-bucket):(i+1)])
+		x_axis = np.arange(1,len(running_avg)+1,1)
+		print(x_axis)
+		print(running_avg)
+		plt.plot(x_axis, running_avg, 'k-')
+		print('!!!!!!!!!!!!!!!!!!!!!!!!')
+		plt.title(('Running average of total return from previous 100 episodes'))
+		plt.xlabel('Episode')
+		plt.ylabel('Average Total Return')
+		plt.savefig(filename)
+
 
 class ActorNN(nn.Module):
 	def __init__(self, input_dims, action_dims, alpha_A, fc1_dims, fc2_dims):
