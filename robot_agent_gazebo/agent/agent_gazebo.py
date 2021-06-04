@@ -29,6 +29,11 @@ class PPO_gazebo:
 		rospy.init_node('RL_agent')
 		self.task = task # The task to solve
 		self.joints_in_use = joints_in_use # this is a boolean 7-vector indicating which joints are in use for the problem
+		#ASSUMPTIONS - joint 7 always in use. for any unused joint i, joint i-1 is also unused
+		self.num_joints_in_use = 0
+		for j in self.joints_in_use:
+			if j==True:
+				self.num_joints_in_use+=1
 		self.dt = 0.1 #sec
 
 		# Publishers and subscribers
@@ -78,7 +83,8 @@ class PPO_gazebo:
 		device= 'cpu'
 
 		# Extract input
-		self.obs_dims = (26,) # joint positions 1-7,joint velocities 1-7,plate theta,plate phi,plate xyz,ball xyz,ball velocity xyz,ball dist from plate center
+		n = self.num_joints_in_use*6 + 2 + 6 + 1 # 51 total if all joints used
+		self.obs_dims = (n,) # xyz pos/vel for links, plate theta, plate phi, ball xyz pos/vel, ball dist from plate center
 		a=0
 		for i in range(len(self.joints_in_use)):
 			if self.joints_in_use[i] == True:
@@ -354,6 +360,12 @@ class PPO_gazebo:
 		
 		link_ros = rospy.ServiceProxy('/gazebo/get_link_state', GetLinkState)
 		self.ball_state = link_ros('ball','world')
+		self.iiwa_link_1_state = link_ros('iiwa_link_1','world')
+		self.iiwa_link_2_state = link_ros('iiwa_link_2','world')
+		self.iiwa_link_3_state = link_ros('iiwa_link_3','world')
+		self.iiwa_link_4_state = link_ros('iiwa_link_4','world')
+		self.iiwa_link_5_state = link_ros('iiwa_link_5','world')
+		self.iiwa_link_6_state = link_ros('iiwa_link_6','world')
 		self.iiwa_link_7_state = link_ros('iiwa_link_7','world')
 		self.ball_in_plate_frame = link_ros('ball','iiwa_link_7')
 		'''
@@ -385,20 +397,21 @@ class PPO_gazebo:
 		theta, phi = self.plate_angles()
 		self.ball_plate_dist_calc()
 
-		'''The state vector is formatted as follows:
-		joint positions 1-7,joint velocities 1-7,plate theta,plate phi,plate xyz,ball xyz,ball velocity xyz,ball dist from plate center
-		'''
+		
 		state_list = []
 
-		for i in self.iiwa_joint_states.position: #add joint states
-			state_list.append(i)
-		for i in self.iiwa_joint_states.velocity: #add joint velocities
-			state_list.append(i)
+		for j in range(len(self.joints_in_use)): #add link states
+			if self.joints_in_use[j]==True:
+				px,py,pz,vx,vy,vz = self.get_link_state(j)
+				state_list.append(px)
+				state_list.append(py)
+				state_list.append(pz)
+				state_list.append(vx)
+				state_list.append(vy)
+				state_list.append(vz)
+			
 		state_list.append(theta)
 		state_list.append(phi)
-		state_list.append(self.iiwa_link_7_state.link_state.pose.position.x)
-		state_list.append(self.iiwa_link_7_state.link_state.pose.position.y)
-		state_list.append(self.iiwa_link_7_state.link_state.pose.position.z)
 		state_list.append(self.ball_state.link_state.pose.position.x)
 		state_list.append(self.ball_state.link_state.pose.position.y)
 		state_list.append(self.ball_state.link_state.pose.position.z)
@@ -408,6 +421,7 @@ class PPO_gazebo:
 		state_list.append(self.ball_dist_from_plate_center)
 
 		state = np.array(state_list)
+		print(state)
 
 		return state
 
@@ -527,6 +541,65 @@ class PPO_gazebo:
 					num_violations+=1
 				i+=1
 		return num_violations
+
+
+	def get_link_state(self,j):
+		if j == 0:
+			return self.iiwa_link_1_state.link_state.pose.position.x, \
+					self.iiwa_link_1_state.link_state.pose.position.y, \
+					self.iiwa_link_1_state.link_state.pose.position.z, \
+					self.iiwa_link_1_state.link_state.twist.linear.x, \
+					self.iiwa_link_1_state.link_state.twist.linear.y, \
+					self.iiwa_link_1_state.link_state.twist.linear.z 
+
+		elif j == 1:
+			return self.iiwa_link_2_state.link_state.pose.position.x, \
+					self.iiwa_link_2_state.link_state.pose.position.y, \
+					self.iiwa_link_2_state.link_state.pose.position.z, \
+					self.iiwa_link_2_state.link_state.twist.linear.x, \
+					self.iiwa_link_2_state.link_state.twist.linear.y, \
+					self.iiwa_link_2_state.link_state.twist.linear.z 
+
+		elif j == 2:
+			return self.iiwa_link_3_state.link_state.pose.position.x, \
+					self.iiwa_link_3_state.link_state.pose.position.y, \
+					self.iiwa_link_3_state.link_state.pose.position.z, \
+					self.iiwa_link_3_state.link_state.twist.linear.x, \
+					self.iiwa_link_3_state.link_state.twist.linear.y, \
+					self.iiwa_link_3_state.link_state.twist.linear.z 
+
+		elif j == 3:
+			return self.iiwa_link_4_state.link_state.pose.position.x, \
+					self.iiwa_link_4_state.link_state.pose.position.y, \
+					self.iiwa_link_4_state.link_state.pose.position.z, \
+					self.iiwa_link_4_state.link_state.twist.linear.x, \
+					self.iiwa_link_4_state.link_state.twist.linear.y, \
+					self.iiwa_link_4_state.link_state.twist.linear.z 
+
+		elif j == 4:
+			return self.iiwa_link_5_state.link_state.pose.position.x, \
+					self.iiwa_link_5_state.link_state.pose.position.y, \
+					self.iiwa_link_5_state.link_state.pose.position.z, \
+					self.iiwa_link_5_state.link_state.twist.linear.x, \
+					self.iiwa_link_5_state.link_state.twist.linear.y, \
+					self.iiwa_link_5_state.link_state.twist.linear.z 
+
+		elif j == 5:
+			return self.iiwa_link_6_state.link_state.pose.position.x, \
+					self.iiwa_link_6_state.link_state.pose.position.y, \
+					self.iiwa_link_6_state.link_state.pose.position.z, \
+					self.iiwa_link_6_state.link_state.twist.linear.x, \
+					self.iiwa_link_6_state.link_state.twist.linear.y, \
+					self.iiwa_link_6_state.link_state.twist.linear.z 
+
+		elif j == 6:
+			return self.iiwa_link_7_state.link_state.pose.position.x, \
+					self.iiwa_link_7_state.link_state.pose.position.y, \
+					self.iiwa_link_7_state.link_state.pose.position.z, \
+					self.iiwa_link_7_state.link_state.twist.linear.x, \
+					self.iiwa_link_7_state.link_state.twist.linear.y, \
+					self.iiwa_link_7_state.link_state.twist.linear.z 
+
 
 	def get_joint_limits(self,joint_num):
 		# returns joint limits (in radians)
